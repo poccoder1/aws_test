@@ -1,85 +1,98 @@
 import json
 import logging
 
-# set up logging
-logging.basicConfig(filename='example.log', level=logging.INFO)
 
-# define the methods to be called
-def validate(config):
+def validate_length_less_than(column, length):
     try:
-        # do validation logic here
-        print(f"Validating with config: {config}")
-        logging.info(f"Validating with config: {config}")
+        print(f"Validating column '{column}' is less than {length}")
+        logging.info(f"Validating column '{column}' is less than {length}")
+        # add validation logic here
     except Exception as e:
-        logging.error(f"Error validating with config {config}: {str(e)}")
+        logging.error(f"Error validating length for column '{column}': {str(e)}")
 
-def enrich(config):
+
+def validate_length_equal(column, length):
     try:
-        # do enrichment logic here
-        print(f"Enriching with config: {config}")
-        logging.info(f"Enriching with config: {config}")
+        print(f"Validating column '{column}' is equal to {length}")
+        logging.info(f"Validating column '{column}' is equal to {length}")
+        # add validation logic here
     except Exception as e:
-        logging.error(f"Error enriching with config {config}: {str(e)}")
+        logging.error(f"Error validating length for column '{column}': {str(e)}")
 
-def append(config):
+
+def validate_length(length_config):
     try:
-        # do append logic here
-        print(f"Appending with config: {config}")
-        logging.info(f"Appending with config: {config}")
-    except Exception as e:
-        logging.error(f"Error appending with config {config}: {str(e)}")
-
-def produce(config):
-    try:
-        # do produce logic here
-        print(f"Producing with config: {config}")
-        logging.info(f"Producing with config: {config}")
-    except Exception as e:
-        logging.error(f"Error producing with config {config}: {str(e)}")
-
-def archive(config):
-    try:
-        # do archive logic here
-        print(f"Archiving with config: {config}")
-        logging.info(f"Archiving with config: {config}")
-    except Exception as e:
-        logging.error(f"Error archiving with config {config}: {str(e)}")
-
-def writer(config):
-    try:
-        # do writer logic here
-        print(f"Writing with config: {config}")
-        logging.info(f"Writing with config: {config}")
-    except Exception as e:
-        logging.error(f"Error writing with config {config}: {str(e)}")
-
-# read the JSON configuration from a file
-with open('config.json', 'r') as f:
-    config_dict = json.load(f)
-
-print(f"Config dict: {config_dict}")
-
-# define a dictionary that maps each key name to the corresponding method
-method_map = {
-    'validator': validate,
-    'enricher': enrich,
-    'appender': append,
-    'producer': produce,
-    'archiver': archive,
-    'writer': writer
-}
-
-print(f"Method map: {method_map}")
-
-# loop over the "config" list and call the appropriate method for each item in order
-for item in config_dict['config']:
-    for key, value in item.items():
-        if key in method_map:
-            method_map[key](value)
+        # Check for the presence of a validation type (LESS_THAN or EQUAL)
+        if "LESS_THAN" in length_config:
+            validation_type = "LESS_THAN"
+        elif "EQUAL" in length_config:
+            validation_type = "EQUAL"
         else:
-            logging.warning(f"No method found for key: {key}")
+            logging.warning(f"No length validation type found in config: {length_config}")
+            return
+
+        # Define a dictionary of length validation functions and their corresponding validation types
+        length_validation_functions = {
+            "LESS_THAN": validate_length_less_than,
+            "EQUAL": validate_length_equal,
+            # Add more length validation functions here as needed
+        }
+
+        # Iterate over the validation type (LESS_THAN or EQUAL) and call the corresponding validation function
+        for validation in length_config[validation_type]:
+            for col, val in validation.items():
+                if validation_type in length_validation_functions:
+                    length_validation_functions[validation_type](col, val)
+                else:
+                    logging.warning(f"No length validation function found for validation type '{validation_type}'")
+                    return
+
+    except Exception as e:
+        logging.error(f"Error validating length with config {length_config}: {str(e)}")
 
 
-#=========
+def enrich_data(data_man_config):
+    try:
+        sql = data_man_config["sql"]
+        print(f"Enriching data using SQL: {sql}")
+        logging.info(f"Enriching data using SQL: {sql}")
+        # add enrichment logic here
+    except Exception as e:
+        logging.error(f"Error enriching data with config {data_man_config}: {str(e)}")
 
-{"config":[{"validator":{"LENGTH":{"LESS_THAN":[{"col1":10},{"col2":13},{"col3":63},{"col4":43},{"col5":33},{"col6":23}],"EQUAL":[{"col2":13},{"col3":63},{"col4":43}]}}},{"enricher":{"DATA_MAN":{"sql":"select * from temp"}}},{"appender":{"DATA_MAN":{"sql":"select * from temp"}}},{"enricher":{"DATA_MAN":{"sql":"select * from temp"}}},{"producer":{"DATA_MAN":{"sql":"select * from temp"}}},{"archiver":{"DATA_MAN":{"sql":"select * from temp"}}}]}
+
+def append_data(data_man_config):
+    try:
+        sql = data_man_config["sql"]
+        print(f"Appending data using SQL: {sql}")
+        logging.info(f"Appending data using SQL: {sql}")
+        # add append logic here
+    except Exception as e:
+        logging.error(f"Error appending data with config {data_man_config}: {str(e)}")
+
+
+def produce_data(data_man_config):
+    try:
+        sql = data_man_config["sql"]
+        print(f"Producing data using SQL: {sql}")
+        logging.info(f"Producing data using SQL: {sql}")
+        # add production logic here
+    except Exception as e:
+        logging.error(f"Error producing data with config {data_man_config}: {str(e)}")
+
+
+def archive_data(data_man_config):
+    try:
+        sql = data_man_config["sql"]
+        print(f"Archiving data using SQL: {sql}")
+        logging.info(f"Archiving data using SQL: {sql}")
+        # add archive logic here
+    except Exception as e:
+        logging.error(f"Error archiving data with config {data_man_config}: {str(e)}")
+
+
+def write_data(data_man_config):
+    try:
+        sql = data_man_config["sql"]
+        print(f"Writing data using SQL: {sql}")
+        logging
