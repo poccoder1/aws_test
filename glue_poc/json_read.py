@@ -1,23 +1,21 @@
-import json
-import logging
-
-
-def validate_length_less_than(column, length):
+def validate(config):
     try:
-        print(f"Validating column '{column}' is less than {length}")
-        logging.info(f"Validating column '{column}' is less than {length}")
-        # add validation logic here
-    except Exception as e:
-        logging.error(f"Error validating length for column '{column}': {str(e)}")
+        # Define a dictionary of validation functions and their corresponding keys
+        validation_functions = {
+            "LENGTH": validate_length,
+            "VALUE": validate_value,
+            # Add more validation functions here as needed
+        }
 
+        # Iterate over the keys in the config and call the corresponding validation function
+        for key in config:
+            if key in validation_functions:
+                validation_functions[key](config[key])
+            else:
+                logging.warning(f"No validation function found for key '{key}' in config: {config}")
 
-def validate_length_equal(column, length):
-    try:
-        print(f"Validating column '{column}' is equal to {length}")
-        logging.info(f"Validating column '{column}' is equal to {length}")
-        # add validation logic here
     except Exception as e:
-        logging.error(f"Error validating length for column '{column}': {str(e)}")
+        logging.error(f"Error validating with config {config}: {str(e)}")
 
 
 def validate_length(length_config):
@@ -31,68 +29,37 @@ def validate_length(length_config):
             logging.warning(f"No length validation type found in config: {length_config}")
             return
 
-        # Define a dictionary of length validation functions and their corresponding validation types
-        length_validation_functions = {
-            "LESS_THAN": validate_length_less_than,
-            "EQUAL": validate_length_equal,
-            # Add more length validation functions here as needed
-        }
-
-        # Iterate over the validation type (LESS_THAN or EQUAL) and call the corresponding validation function
+        # Iterate over the validation type (LESS_THAN or EQUAL)
         for validation in length_config[validation_type]:
             for col, val in validation.items():
-                if validation_type in length_validation_functions:
-                    length_validation_functions[validation_type](col, val)
-                else:
-                    logging.warning(f"No length validation function found for validation type '{validation_type}'")
-                    return
+                # call the length validation method with the column name and length
+                if validation_type == "LESS_THAN":
+                    validate_length_generic(col, val, "LESS_THAN")
+                elif validation_type == "EQUAL":
+                    validate_length_generic(col, val, "EQUAL")
 
     except Exception as e:
         logging.error(f"Error validating length with config {length_config}: {str(e)}")
 
 
-def enrich_data(data_man_config):
+def validate_value(value_config):
     try:
-        sql = data_man_config["sql"]
-        print(f"Enriching data using SQL: {sql}")
-        logging.info(f"Enriching data using SQL: {sql}")
-        # add enrichment logic here
+        # do value validation logic here
+        print(f"Validating value with config: {value_config}")
+        logging.info(f"Validating value with config: {value_config}")
     except Exception as e:
-        logging.error(f"Error enriching data with config {data_man_config}: {str(e)}")
+        logging.error(f"Error validating value with config {value_config}: {str(e)}")
 
 
-def append_data(data_man_config):
+def validate_length_generic(column, length, validation_type):
     try:
-        sql = data_man_config["sql"]
-        print(f"Appending data using SQL: {sql}")
-        logging.info(f"Appending data using SQL: {sql}")
-        # add append logic here
+        if validation_type == "LESS_THAN":
+            print(f"Validating column '{column}' is less than {length}")
+            logging.info(f"Validating column '{column}' is less than {length}")
+        elif validation_type == "EQUAL":
+            print(f"Validating column '{column}' is equal to {length}")
+            logging.info(f"Validating column '{column}' is equal to {length}")
+        else:
+            logging.warning(f"Unknown validation type '{validation_type}' for column '{column}'")
     except Exception as e:
-        logging.error(f"Error appending data with config {data_man_config}: {str(e)}")
-
-
-def produce_data(data_man_config):
-    try:
-        sql = data_man_config["sql"]
-        print(f"Producing data using SQL: {sql}")
-        logging.info(f"Producing data using SQL: {sql}")
-        # add production logic here
-    except Exception as e:
-        logging.error(f"Error producing data with config {data_man_config}: {str(e)}")
-
-
-def archive_data(data_man_config):
-    try:
-        sql = data_man_config["sql"]
-        print(f"Archiving data using SQL: {sql}")
-        logging.info(f"Archiving data using SQL: {sql}")
-        # add archive logic here
-    except Exception as e:
-        logging.error(f"Error archiving data with config {data_man_config}: {str(e)}")
-
-
-def write_data(data_man_config):
-    try:
-        sql = data_man_config["sql"]
-        print(f"Writing data using SQL: {sql}")
-        logging
+        logging.error(f"Error validating length for column '{column}': {str(e)}")
