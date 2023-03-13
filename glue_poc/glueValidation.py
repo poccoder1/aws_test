@@ -1,53 +1,45 @@
-from pyspark.sql.functions import explode
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+import xml.etree.ElementTree as ET
+import csv
 
-# define the schema for the XML data
-schema = StructType([
-    StructField("reportID", StringType()),
-    StructField("BD", StringType()),
-    StructField("ccc", StringType()),
-    StructField("type", StringType()),
-    StructField("PPP", StringType()),
-    StructField("inr", StringType()),
-    StructField("PTY", StructType([
-        StructField("ID", StringType()),
-        StructField("R", IntegerType())
-    ])),
-    StructField("Instragram", StructType([
-        StructField("ID", StringType()),
-        StructField("secType", StringType()),
-        StructField("mmy", StringType()),
-        StructField("change", StringType()),
-        StructField("low", IntegerType()),
-        StructField("high", IntegerType()),
-        StructField("mid", IntegerType())
-    ])),
-    StructField("undy", StructType([
-        StructField("ID", StringType()),
-        StructField("sectype", StringType()),
-        StructField("check", StringType()),
-        StructField("by", StringType())
-    ])),
-    StructField("QNTY", StructType([
-        StructField("short", IntegerType()),
-        StructField("Typ", StringType())
-    ]))
-])
 
-# read the XML data into a DataFrame
-df = spark.read.format("xml") \
-    .option("rowTag", "level1") \
-    .schema(schema) \
-    .load("s3://path/to/xml/file.xml")
+s3_client = boto3.client('s3')
+s3_object = s3_client.get_object(Bucket='your-bucket-name', Key='your-file-name.xml')
+xml_data = s3_object['Body'].read().decode('utf-8')
 
-# explode the PTY and QNTY columns to create a new row for each entry
-df = df.selectExpr("reportID", "BD", "ccc", "type", "PPP", "inr", "Instragram.ID as instaID",
-                   "Instragram.secType", "Instragram.mmy", "Instragram.change", "Instragram.low",
-                   "Instragram.high", "Instragram.mid", "undy.ID as undyID", "undy.sectype",
-                   "undy.check", "undy.by", "PTY.*", "QNTY.*") \
-    .withColumn("PTY", explode("PTY")) \
-    .withColumn("QNTY", explode("QNTY"))
 
-# write the DataFrame to CSV or table format
-df.write.format("csv").option("header", "true").save("s3://path/to/output/csv")
-df.write.format("parquet").saveAsTable("database.table")
+
+def xml_to_csv(xml_data):
+    # parse the XML data
+    root = ET.fromstring(xml_data)
+
+    # get the column names from the XML data
+    column_names = []
+    for child in root[0]:
+        if len(child.attrib) > 0:
+            column_names.append(list(child.attrib.keys())[0])
+        else:
+            for subchild in child:
+                column_names.append(list(subchild.attrib.keys())[0])
+
+    # write the CSV data
+    csv_data = []
+    csv_data.append(column_names)
+    for child in root:
+        row = []
+        for column_name in column_names:
+            if root[0].findall(f'*[@{column_name}]'):
+                row.append(child.attrib[column_name])
+            else:
+                subchild = child.find(f'./*/*[@{column_name}]')
+                if subchild is not None:
+                    row.append(subchild.attrib[column_name])
+                else:
+                    row.append('')
+        csv_data.append(row)
+
+    # convert the CSV data to a string
+    csv_string = ''
+    for row in csv_data:
+        csv_string += ','.join(row) + '\n'
+
+    return csv_string
