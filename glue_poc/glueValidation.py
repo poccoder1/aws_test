@@ -1,45 +1,49 @@
-import xml.etree.ElementTree as ET
-import csv
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from awsglue.context import GlueContext
+from awsglue.dynamicframe import DynamicFrame
+from pyspark.context import SparkContext
+from pyspark.sql.functions import *
+from pyspark.sql import SparkSession
+import logging
 
+# Set up logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-s3_client = boto3.client('s3')
-s3_object = s3_client.get_object(Bucket='your-bucket-name', Key='your-file-name.xml')
-xml_data = s3_object['Body'].read().decode('utf-8')
+# Create GlueContext and SparkContext
+glueContext = GlueContext(SparkContext.getOrCreate())
+spark = glueContext.spark_session
 
+# Get input and output paths from arguments
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'INPUT_PATH', 'OUTPUT_PATH'])
 
+# Read the input XML file as DynamicFrame
+input_dynamic_frame = glueContext.create_dynamic_frame.from_options(
+        format='xml',
+        connection_options={
+            'paths': [args['INPUT_PATH']],
+            'recurse': True
+        },
+        transformation_ctx="input_dynamic_frame"
+)
 
-def xml_to_csv(xml_data):
-    # parse the XML data
-    root = ET.fromstring(xml_data)
+# Convert the DynamicFrame to DataFrame
+input_dataframe = input_dynamic_frame.toDF()
 
-    # get the column names from the XML data
-    column_names = []
-    for child in root[0]:
-        if len(child.attrib) > 0:
-            column_names.append(list(child.attrib.keys())[0])
-        else:
-            for subchild in child:
-                column_names.append(list(subchild.attrib.keys())[0])
+# Flatten the nested structure of the DataFrame
+flattened_dataframe = input_dataframe.select(
+    col("*"),
+    *[col(column).alias("_".join(column.split("."))) for column in input_dataframe.schema.names if "." in column]
+).drop(*[column for column in input_dataframe.schema.names if "." in column])
 
-    # write the CSV data
-    csv_data = []
-    csv_data.append(column_names)
-    for child in root:
-        row = []
-        for column_name in column_names:
-            if root[0].findall(f'*[@{column_name}]'):
-                row.append(child.attrib[column_name])
-            else:
-                subchild = child.find(f'./*/*[@{column_name}]')
-                if subchild is not None:
-                    row.append(subchild.attrib[column_name])
-                else:
-                    row.append('')
-        csv_data.append(row)
+# Write the DataFrame to CSV format
+try:
+    flattened_dataframe.write.mode("overwrite").csv(args['OUTPUT_PATH'])
+    logger.info(f"Converted XML file to CSV format and saved at {args['OUTPUT_PATH']}")
+except Exception as e:
+    logger.error(f"Error converting XML file to CSV format: {e}")
 
-    # convert the CSV data to a string
-    csv_string = ''
-    for row in csv_data:
-        csv_string += ','.join(row) + '\n'
-
-    return csv_string
+# End the job
+glueContext.end_of_job()
