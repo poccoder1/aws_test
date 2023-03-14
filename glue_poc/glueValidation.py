@@ -1,35 +1,22 @@
 import xml.etree.ElementTree as ET
 import pandas as pd
 
-# Parse XML file and get root element
-tree = ET.parse('filename.xml')
-root = tree.getroot()
-
-# Create list to hold dictionaries of element data
-elements_list = []
-
-# Iterate over all child elements of root
-for elem in root.iter():
-    # Get element tag and attributes
-    tag = elem.tag
-    attributes = elem.attrib
-
-    # Create dictionary to hold element data
-    element_dict = {'tag': tag}
-
-    # Add attributes to dictionary
-    if attributes:
-        element_dict.update(attributes)
-
-    # Add text of element to dictionary
-    if elem.text and elem.text.strip():
-        element_dict['text'] = elem.text.strip()
-
-    # Append dictionary to list
-    elements_list.append(element_dict)
-
-# Convert list of dictionaries to pandas DataFrame
-df = pd.DataFrame(elements_list)
-
-# Output DataFrame as table
-print(df.to_string(index=False))
+def parse_xml_to_df(xml_str):
+    root = ET.fromstring(xml_str)
+    rows = []
+    columns = []
+    for child in root:
+        if not columns:
+            columns.append('Index')
+            for element in child.iter():
+                columns.append(element.tag)
+            columns = [col.replace('{http://www.fixprotocol.org/FIXML-5-0-SP2}', '') for col in columns]
+            columns = [col.replace('_', ' ') for col in columns]
+        row = [str(i) for i in range(len(rows)+1)]
+        for element in child.iter():
+            if element.text:
+                row.append(element.text)
+            else:
+                row.append('')
+        rows.append(row)
+    return pd.DataFrame(rows, columns=columns)
