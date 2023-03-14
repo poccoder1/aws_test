@@ -1,49 +1,49 @@
-import sys
-from awsglue.transforms import *
-from awsglue.utils import getResolvedOptions
-from awsglue.context import GlueContext
-from awsglue.dynamicframe import DynamicFrame
-from pyspark.context import SparkContext
-from pyspark.sql.functions import *
-from pyspark.sql import SparkSession
+import xml.etree.ElementTree as ET
+import csv
+import json
 import logging
 
-# Set up logger
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(filename='xml_parser.log', level=logging.ERROR)
 
-# Create GlueContext and SparkContext
-glueContext = GlueContext(SparkContext.getOrCreate())
-spark = glueContext.spark_session
+def parse_xml_to_csv(xml_file_path, csv_file_path):
+    try:
+        # Open the XML file
+        tree = ET.parse(xml_file_path)
+        root = tree.getroot()
 
-# Get input and output paths from arguments
-args = getResolvedOptions(sys.argv, ['JOB_NAME', 'INPUT_PATH', 'OUTPUT_PATH'])
+        # Open the CSV file for writing
+        with open(csv_file_path, 'w', newline='') as csv_file:
+            writer = csv.writer(csv_file)
 
-# Read the input XML file as DynamicFrame
-input_dynamic_frame = glueContext.create_dynamic_frame.from_options(
-        format='xml',
-        connection_options={
-            'paths': [args['INPUT_PATH']],
-            'recurse': True
-        },
-        transformation_ctx="input_dynamic_frame"
-)
+            # Write the header row
+            header_row = []
+            for child in root[0]:
+                header_row.append(child.tag)
+            writer.writerow(header_row)
 
-# Convert the DynamicFrame to DataFrame
-input_dataframe = input_dynamic_frame.toDF()
+            # Write each row of data
+            for item in root:
+                data_row = []
+                for child in item:
+                    if len(child) > 0:
+                        # If the child has nested data, convert it to JSON format
+                        data_row.append(json.dumps(xml_to_dict(child)))
+                    else:
+                        data_row.append(child.text)
+                writer.writerow(data_row)
+    except Exception as e:
+        logging.exception(f'Error while parsing {xml_file_path}: {e}')
 
-# Flatten the nested structure of the DataFrame
-flattened_dataframe = input_dataframe.select(
-    col("*"),
-    *[col(column).alias("_".join(column.split("."))) for column in input_dataframe.schema.names if "." in column]
-).drop(*[column for column in input_dataframe.schema.names if "." in column])
-
-# Write the DataFrame to CSV format
-try:
-    flattened_dataframe.write.mode("overwrite").csv(args['OUTPUT_PATH'])
-    logger.info(f"Converted XML file to CSV format and saved at {args['OUTPUT_PATH']}")
-except Exception as e:
-    logger.error(f"Error converting XML file to CSV format: {e}")
-
-# End the job
-glueContext.end_of_job()
+def xml_to_dict(xml):
+    # Convert an XML element to a dictionary
+    if len(xml) == 0:
+        return xml.text
+    result = {}
+    for child in xml:
+        if child.tag in result:
+            if type(result[child.tag]) is not list:
+                result[child.tag] = [result[child.tag]]
+            result[child.tag].append(xml_to_dict(child))
+        else:
+            result[child.tag] = xml_to_dict(child)
+    return result
