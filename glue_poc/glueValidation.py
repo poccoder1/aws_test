@@ -15,7 +15,8 @@ def parse_xml_to_df(xml_file):
                 row[element.tag] = json.dumps(xml_to_dict(element))
         df = df.append(row, ignore_index=True)
 
-    df.set_index('name', inplace=True)
+    df.insert(0, 'index', range(1, len(df) + 1))
+    df.set_index('index', inplace=True)
     return df
 
 def xml_to_dict(xml_element):
