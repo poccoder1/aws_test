@@ -1,8 +1,9 @@
 import xml.etree.ElementTree as ET
 import pandas as pd
 
-def xml_to_df(xml_string):
-    root = ET.fromstring(xml_string)
+def xml_to_df(file_path):
+    tree = ET.parse(file_path)
+    root = tree.getroot()
     rows = []
     column_names = set()
     for child in root:
