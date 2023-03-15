@@ -1,33 +1,30 @@
 import xml.etree.ElementTree as ET
 import pandas as pd
 
-# load the XML file
-tree = ET.parse('example.xml')
-root = tree.getroot()
+def xml_to_dataframe(xml_file):
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
 
-# create an empty list to store dictionaries
-rows = []
+    # Extract all unique tags as column names
+    all_tags = set([elem.tag for elem in root.iter()])
+    column_names = list(all_tags)
 
-# iterate over the AsgnRpt tags
-for asgn_rpt in root.findall('.//AsgnRpt'):
-    row = {}
+    # Extract all attributes as additional column names
+    all_attributes = set([attr for elem in root.iter() for attr in elem.attrib.keys()])
+    column_names += list(all_attributes)
 
-    # iterate over the child tags of each AsgnRpt
-    for child in asgn_rpt:
-        # check if the tag has any sub-tags
-        if len(child) > 0:
-            # if it has sub-tags, iterate over them and add their values to the row dictionary
-            for sub in child:
-                row[sub.tag] = sub.text
-        else:
-            # if the tag has no sub-tags, add its value to the row dictionary
-            row[child.tag] = child.text
+    # Loop through each element and extract its values
+    rows = []
+    for elem in root.iter():
+        row = {}
+        for column in column_names:
+            if column in elem.attrib:
+                row[column] = elem.attrib[column]
+            else:
+                row[column] = elem.find(column).text if elem.find(column) is not None else ''
+        rows.append(row)
 
-    # add the row dictionary to the rows list
-    rows.append(row)
+    # Convert to a Pandas DataFrame
+    df = pd.DataFrame(rows, columns=column_names)
 
-# create a pandas DataFrame from the rows list
-df = pd.DataFrame(rows)
-
-# print the resulting DataFrame
-print(df)
+    return df
