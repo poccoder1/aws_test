@@ -21,7 +21,13 @@ def xml_to_dataframe(xml_file):
             if column in elem.attrib:
                 row[column] = elem.attrib[column]
             else:
-                row[column] = elem.find(column).text if elem.find(column) is not None else ''
+                if elem.find(column) is not None:
+                    if elem.find(column).text is not None:
+                        row[column] = elem.find(column).text
+                    else:
+                        row[column] = ''
+                else:
+                    row[column] = ''
         rows.append(row)
 
     # Convert to a Pandas DataFrame
