@@ -1,65 +1,44 @@
 import sys
-from awsglue.transforms import *
-from awsglue.utils import getResolvedOptions
-from pyspark.context import SparkContext
-from awsglue.context import GlueContext
-from awsglue.dynamicframe import DynamicFrame
+ from awsglue.transforms import *
+ from awsglue.utils import getResolvedOptions
+ from pyspark.context import SparkContext
+ from awsglue.context import GlueContext
+ from awsglue.dynamicframe import DynamicFrame
 
-# Define the job parameters
-args = getResolvedOptions(sys.argv, ['JOB_NAME', 'input_path', 'output_path'])
+ # Get the input and output paths from the job arguments
+ args = getResolvedOptions(sys.argv, ['input_path', 'output_path'])
 
-# Create a SparkContext and GlueContext
-sc = SparkContext()
-glueContext = GlueContext(sc)
+ # Create a Spark context and Glue context
+ sc = SparkContext()
+ glueContext = GlueContext(sc)
 
-# Read the input XML file as a DynamicFrame
-input_dyf = glueContext.create_dynamic_frame.from_options(
-    connection_type="s3",
-    connection_options={"paths": [args['input_path']]},
-    format="xml",
-    transformation_ctx="input_dyf"
-)
+ # Read the input XML file as a DynamicFrame
+ inputDf = glueContext \
+     .read \
+     .format("xml") \
+     .option("rowTag", "*") \
+     .option("excludeAttribute", "true") \
+     .load(args['input_path'])
 
-# Define a function to convert an XML node into a dictionary
-def xml_node_to_dict(node):
-    if node.getChildren():
-        return {child.name: xml_node_to_dict(child) for child in node.getChildren()}
-    else:
-        return node.value
+ # Flatten the DynamicFrame by exploding the desired fields
+ def flatten_fields(df, field_name):
+     flat_fields = []
+     for field in df.schema.fields:
+         if field.dataType.simpleString() == "struct":
+             flat_fields += flatten_fields(df.select(field.name + ".*"), field_name + field.name + ".")
+         else:
+             flat_fields.append(field_name + field.name)
+     return [col(col_name).alias(col_name.replace(field_name, "")) for col_name in flat_fields]
 
-# Extract the root node from the input file
-root_node = input_dyf.root
+ explodedDf = inputDf \
+     .select(flatten_fields(inputDf, ""))
 
-# Extract the child nodes from the root node
-child_nodes = root_node.getChildren()
-
-# Create an empty list to hold the table rows
-table_rows = []
-
-# Loop over the child nodes and extract the data into table rows
-for child_node in child_nodes:
-    table_row = {}
-    for field in child_node.getFields():
-        if isinstance(field.value, list):
-            table_row[field.name] = []
-            for list_item in field.value:
-                table_row[field.name].append(xml_node_to_dict(list_item))
-        else:
-            table_row[field.name] = xml_node_to_dict(field)
-    table_rows.append(table_row)
-
-# Convert the table rows into a DynamicFrame
-output_dyf = DynamicFrame.fromDF(
-    spark.createDataFrame(table_rows),
-    glueContext,
-    "output_dyf"
-)
-
-# Write the output DynamicFrame to S3 in tabular format
-glueContext.write_dynamic_frame.from_options(
-    frame=output_dyf,
-    connection_type="s3",
-    connection_options={"path": args['output_path'], "partitionKeys": []},
-    format="csv",
-    transformation_ctx="output_dyf"
-)
+ # Write the output DynamicFrame to the output path
+ outputDf = DynamicFrame.fromDF(explodedDf, glueContext, "outputDf")
+ outputDf \
+     .write \
+     .format("csv") \
+     .option("header", "true") \
+     .option("delimiter", ",") \
+     .mode("overwrite") \
+     .save(args['output_path'])
