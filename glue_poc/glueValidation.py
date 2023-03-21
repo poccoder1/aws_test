@@ -1,27 +1,26 @@
 from pyspark.sql.functions import col
+from pyspark.sql import SparkSession
 from pydeequ.checks import *
 from pydeequ.verification import *
 
-checks = [
-    Analysis(
-        Column("col1"),
-        MaximumLength(len_=10),
-        "col1 has maximum length of 10"
-    ),
-    Analysis(
-        Column("col2"),
-        IsEqualTo("constant_value"),
-        "col2 is equals to some constant value"
-    ),
-    Analysis(
-        Column("col3"),
-        IsNotNull(),
-        "col3 is not null"
-    ),
-]
+# create a SparkSession
+spark = SparkSession.builder.appName("Data Quality Check").getOrCreate()
 
-# Run the checks
-results = VerificationSuite(spark) \
-    .onData(df) \
-    .addChecks(checks) \
-    .run()
+# read the input data into a dataframe
+df = spark.read.format("csv").option("header", True).load("path/to/your/data.csv")
+
+# create the checks
+checks = Check(
+    check_level=CheckLevel.Warning,
+    checks=[
+        Check(col("col1"), MaxLengthConstraint(10)),
+        Check(col("col2"), EqualsConstraint("constant_value")),
+        Check(col("col3"), IsNotNullConstraint()),
+    ],
+)
+
+# run the checks and get the results
+result = VerificationSuite(spark).onData(df).addCheck(checks).run()
+
+# print the results
+print(result.checkResults)
