@@ -13,7 +13,7 @@ df = spark.read.format("csv").option("header", True).load("path/to/your/data.csv
 checks = Check(
     check_level=CheckLevel.Warning,
     checks=[
-        Check(col("col1"), MaxLengthConstraint(10)),
+        Check(col("col1"), SizeConstraint(maximum=10)),
         Check(col("col2"), EqualsConstraint("constant_value")),
         Check(col("col3"), IsNotNullConstraint()),
     ],
