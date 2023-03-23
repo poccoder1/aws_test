@@ -19,7 +19,10 @@ def generate_schema(elem, unique_tags):
             schema.append(StructField("@" + child.tag, StringType()))
         else:
             # Add a new field to the schema for nested structures
-            schema.append(StructField(child.tag, generate_schema(child, unique_tags), True))
+            field = StructField(child.tag, generate_schema(child, unique_tags), True)
+            for attr in child.attrib:
+                field.add(StructField("@" + attr, StringType()))
+            schema.append(field)
     return StructType(schema)
 
 # Generate the input schema dynamically
