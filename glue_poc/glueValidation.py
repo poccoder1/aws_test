@@ -79,6 +79,34 @@ output_df = input_df.selectExpr(
 #===========
 
 from pyspark.sql.functions import explode
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+
+schema = StructType([
+    StructField("RptID", StringType()),
+    StructField("BizDt", StringType()),
+    StructField("Ccy", StringType()),
+    StructField("SetSesID", StringType()),
+    StructField("UndSetPx", StringType()),
+    StructField("AsgnMeth", StringType()),
+    StructField("PTY_ID", StringType()),
+    StructField("PTY_R", StringType()),
+    StructField("PTY_Sub_Id", StringType()),
+    StructField("PTY_Sub_type", StringType()),
+    StructField("Instrmt_ID", StringType()),
+    StructField("Instrmt_SecType", StringType()),
+    StructField("Instrmt_MMY", StringType()),
+    StructField("Instrmt_Exch", StringType()),
+    StructField("Instrmt_StrKPx", StringType()),
+    StructField("Instrmt_PutCall", StringType()),
+    StructField("Instrmt_Fctr", StringType()),
+    StructField("Instrmt_PCFctr", StringType()),
+    StructField("Undly_ID", StringType()),
+    StructField("Undly_SecTyp", StringType()),
+    StructField("Undly_MMY", StringType()),
+    StructField("Undly_Exch", StringType()),
+    StructField("Qty_Short", StringType()),
+    StructField("Qty_Typ", StringType())
+])
 
 # Flatten the nested XML structure using spark-xml
 df = spark.read.format("xml") \
