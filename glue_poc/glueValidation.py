@@ -1,28 +1,10 @@
-from pyspark.sql import SparkSession
-from pydeequ.checks import *
-from pydeequ.verification import *
+from pyspark.sql.functions import explode
 
-# create a SparkSession
-spark = SparkSession.builder.appName("Data Quality Check").getOrCreate()
+# Load the XML data into a DataFrame
+df = spark.read.format("xml").options(rowTag="AsgnRpt").load("path/to/xml/file.xml")
 
-# read the input data into a dataframe
-df = spark.read.format("csv").option("header", True).load("path/to/your/data.csv")
+# Flatten the DataFrame
+flattened_df = df.selectExpr("AsgnRpt.*", "explode(PTY) as PTY", "PTY.*", "Instrmt.*", "Undly.*", "explode(Qty) as Qty")
 
-# create the checks
-checks = Check(
-    check_level=CheckLevel.Warning,
-    checks=[
-        Check(spark, CheckLevel.Warning, "Maximum length check for all columns", [
-            SizeConstraint(column, ">", 0) for column in df.columns
-        ]),
-        Check(spark, CheckLevel.Warning, "Null check for all columns", [
-            CompletenessConstraint(column) for column in df.columns
-        ])
-    ],
-)
-
-# run the checks and get the results
-result = VerificationSuite(spark).onData(df).addChecks(checks).run()
-
-# print the results
-print(result.checkResults)
+# Display the resulting table
+flattened_df.show()
