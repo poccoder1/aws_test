@@ -1,43 +1,41 @@
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import explode
 
-# Create a Spark session
-spark = SparkSession.builder.appName("XML to CSV").getOrCreate()
+df = spark.read.format("com.databricks.spark.xml") \
+    .option("rowTag", "AsgnRpt") \
+    .load("file.xml")
 
-# Read the XML file as a Spark DataFrame
-df = spark.read.format("xml").option("rowTag", "AsgnRpt").load("path/to/xml/file.xml")
-
-# Flatten the nested structure of the PTY and Sub elements
-df_flat = df.selectExpr("RptID", "BizDt", "Ccy", "SetSesID", "UndSetPx", "AsgnMeth",
-                        "explode(PTY) as PTY", "Instrmt.*", "Undly.*", "explode(Qty) as Qty")
-
-# Extract the desired columns and rename them
-df_csv = df_flat.selectExpr(
-    "RptID",
-    "BizDt",
-    "Ccy",
-    "SetSesID",
-    "UndSetPx",
-    "AsgnMeth",
-    "PTY.@ID as PTY_ID",
-    "PTY.@R as PTY_R",
-    "PTY.Sub.@Id as Sub_Id",
-    "PTY.Sub.@type as Sub_type",
-    "ID as Instrmt_ID",
-    "SecType as Instrmt_SecType",
-    "MMY as Instrmt_MMY",
-    "Exch as Instrmt_Exch",
-    "StrKPx as Instrmt_StrKPx",
-    "PutCall as Instrmt_PutCall",
-    "Fctr as Instrmt_Fctr",
-    "PCFctr as Instrmt_PCFctr",
-    "_ID as Undly_ID",
-    "_SecTyp as Undly_SecTyp",
-    "_MMY as Undly_MMY",
-    "_Exch as Undly_Exch",
-    "Qty.@Short as Qty_Short",
-    "Qty.@Typ as Qty_Typ"
+df_exploded_pty = df.selectExpr(
+    "RptID", "BizDt", "Ccy", "SetSesID", "UndSetPx", "AsgnMeth",
+    "explode(PTY) as PTY"
+).selectExpr(
+    "RptID", "BizDt", "Ccy", "SetSesID", "UndSetPx", "AsgnMeth",
+    "PTY.ID as PTY_ID", "PTY.R as PTY_R"
 )
 
-# Write the CSV file
-df_csv.write.csv("path/to/csv/file.csv", header=True)
+df_exploded_qty = df.selectExpr(
+    "RptID", "BizDt", "Ccy", "SetSesID", "UndSetPx", "AsgnMeth",
+    "explode(Qty) as Qty"
+).selectExpr(
+    "RptID", "BizDt", "Ccy", "SetSesID", "UndSetPx", "AsgnMeth",
+    "Qty.Short as Qty_Short", "Qty.Typ as Qty_Typ"
+)
+
+df_final = df.selectExpr(
+    "RptID", "BizDt", "Ccy", "SetSesID", "UndSetPx", "AsgnMeth",
+    "Instrmt.ID as Instrmt_ID", "Instrmt.SecType as Instrmt_SecType",
+    "Instrmt.MMY as Instrmt_MMY", "Instrmt.Exch as Instrmt_Exch",
+    "Instrmt.StrKPx as Instrmt_StrKPx", "Instrmt.PutCall as Instrmt_PutCall",
+    "Instrmt.Fctr as Instrmt_Fctr", "Instrmt.PCFctr as Instrmt_PCFctr",
+    "Undly.ID as Undly_ID", "Undly.SecTyp as Undly_SecTyp",
+    "Undly.MMY as Undly_MMY", "Undly.Exch as Undly_Exch"
+)
+
+df_final = df_final.crossJoin(df_exploded_pty).crossJoin(df_exploded_qty).select(
+    "RptID", "BizDt", "Ccy", "SetSesID", "UndSetPx", "AsgnMeth",
+    "PTY_ID", "PTY_R", "Qty_Short", "Qty_Typ",
+    "Instrmt_ID", "Instrmt_SecType", "Instrmt_MMY", "Instrmt_Exch",
+    "Instrmt_StrKPx", "Instrmt_PutCall", "Instrmt_Fctr", "Instrmt_PCFctr",
+    "Undly_ID", "Undly_SecTyp", "Undly_MMY", "Undly_Exch"
+)
+
+df_final.show()
