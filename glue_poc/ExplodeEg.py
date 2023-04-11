@@ -1,38 +1,18 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import explode, concat_ws
+from pyspark.sql.functions import explode
 
-# Create a SparkSession
+# Create a Spark session
 spark = SparkSession.builder.appName("XML to CSV").getOrCreate()
 
-# Read the XML file into a DataFrame
-df = spark.read.format("com.databricks.spark.xml").options(rowTag="AsgnRpt").load("input.xml")
+# Read the XML file as a Spark DataFrame
+df = spark.read.format("xml").option("rowTag", "AsgnRpt").load("path/to/xml/file.xml")
 
-# Select the required columns and explode the PTY and Sub columns
-df = df.selectExpr(
-    "RptID",
-    "BizDt",
-    "Ccy",
-    "SetSesID",
-    "UndSetPx",
-    "AsgnMeth",
-    "explode(PTY) as PTY",
-    "Instrmt.ID as Instrmt_ID",
-    "Instrmt.SecType as Instrmt_SecType",
-    "Instrmt.MMY as Instrmt_MMY",
-    "Instrmt.Exch as Instrmt_Exch",
-    "Instrmt.StrKPx as Instrmt_StrKPx",
-    "Instrmt.PutCall as Instrmt_PutCall",
-    "Instrmt.Fctr as Instrmt_Fctr",
-    "Instrmt.PCFctr as Instrmt_PCFctr",
-    "Undly.ID as Undly_ID",
-    "Undly.SecTyp as Undly_SecTyp",
-    "Undly.MMY as Undly_MMY",
-    "Undly.Exch as Undly_Exch",
-    "explode(Qty) as Qty"
-)
+# Flatten the nested structure of the PTY and Sub elements
+df_flat = df.selectExpr("RptID", "BizDt", "Ccy", "SetSesID", "UndSetPx", "AsgnMeth",
+                        "explode(PTY) as PTY", "Instrmt.*", "Undly.*", "explode(Qty) as Qty")
 
-# Select the required columns and concatenate the sub-columns
-df = df.selectExpr(
+# Extract the desired columns and rename them
+df_csv = df_flat.selectExpr(
     "RptID",
     "BizDt",
     "Ccy",
@@ -43,24 +23,21 @@ df = df.selectExpr(
     "PTY.@R as PTY_R",
     "PTY.Sub.@Id as Sub_Id",
     "PTY.Sub.@type as Sub_type",
-    "Instrmt_ID",
-    "Instrmt_SecType",
-    "Instrmt_MMY",
-    "Instrmt_Exch",
-    "Instrmt_StrKPx",
-    "Instrmt_PutCall",
-    "Instrmt_Fctr",
-    "Instrmt_PCFctr",
-    "Undly_ID",
-    "Undly_SecTyp",
-    "Undly_MMY",
-    "Undly_Exch",
+    "ID as Instrmt_ID",
+    "SecType as Instrmt_SecType",
+    "MMY as Instrmt_MMY",
+    "Exch as Instrmt_Exch",
+    "StrKPx as Instrmt_StrKPx",
+    "PutCall as Instrmt_PutCall",
+    "Fctr as Instrmt_Fctr",
+    "PCFctr as Instrmt_PCFctr",
+    "_ID as Undly_ID",
+    "_SecTyp as Undly_SecTyp",
+    "_MMY as Undly_MMY",
+    "_Exch as Undly_Exch",
     "Qty.@Short as Qty_Short",
     "Qty.@Typ as Qty_Typ"
 )
 
-# Write the data to a CSV file
-df.write.option("header", "true").csv("output.csv")
-
-# Stop the SparkSession
-spark.stop()
+# Write the CSV file
+df_csv.write.csv("path/to/csv/file.csv", header=True)
