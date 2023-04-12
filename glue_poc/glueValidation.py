@@ -1,10 +1,11 @@
-from pyspark.sql.functions import explode, flatten, array, struct, lit
+from pyspark.sql.functions import explode, flatten, array, struct, concat_ws, concat, lit
 
 # Load the XML data
 xml_data = spark.read.format('xml').option('rowTag', 'Report').load('path/to/xml_file.xml')
 
 # Convert the DataFrame to a format that can be flattened
-converted_data = xml_data.selectExpr("to_xml(struct(*)) AS xmls")
+xml_string = concat_ws('', *[concat(lit('<'), col('_name'), lit('>'), col('_VALUE'), lit('</'), col('_name'), lit('>')) for col in xml_data.schema.fields])
+converted_data = xml_data.select(struct(xml_string).alias('xmls'))
 
 # Flatten the nested columns
 flattened_data = spark.read.option("rowTag", "root").xml(converted_data.rdd.map(lambda r: r.xmls))
