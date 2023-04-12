@@ -1,14 +1,15 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import explode, flatten
-
-# Create a SparkSession
-spark = SparkSession.builder.appName('XML to CSV').getOrCreate()
+from pyspark.sql.functions import explode, flatten, array, struct, lit
 
 # Load the XML data
 xml_data = spark.read.format('xml').option('rowTag', 'Report').load('path/to/xml_file.xml')
 
+# Convert the DataFrame to a format that can be flattened
+converted_data = xml_data.selectExpr("to_xml(struct(*)) AS xmls")
+
 # Flatten the nested columns
-flattened_data = xml_data.select(flatten(xml_data.columns))
+flattened_data = spark.read.option("rowTag", "root").xml(converted_data.rdd.map(lambda r: r.xmls))
+
+flattened_data = flattened_data.select(flatten(flattened_data.schema.names))
 
 # Explode arrays
 exploded_data = flattened_data.select('*', explode(flattened_data.acctTyGrp).alias('acctTyGrp_exp'))
@@ -26,12 +27,10 @@ output_data = exploded_data.select(
     'currMarComp._Name',
     'MarketRisk_Aggr_T',
     'MarketRisk_Aggr_T-1',
-    'LiquAdj_exp._component',
-    'LiquAdj_exp._VALUE'
+    struct(
+        array(lit('LiquAdj_exp._component'), lit('LiquAdj_exp._VALUE'))
+    ).alias('LiquAdj_exp')
 )
 
 # Write the output to a CSV file
 output_data.write.csv('path/to/output_file.csv', header=True)
-
-# Stop the SparkSession
-spark.stop()
