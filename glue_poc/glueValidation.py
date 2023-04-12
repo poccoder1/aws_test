@@ -29,7 +29,8 @@ output_data = exploded_data.select(
     'MarketRisk_Aggr_T',
     'MarketRisk_Aggr_T-1',
     struct(
-        array(lit('LiquAdj_exp._component'), lit('LiquAdj_exp._VALUE'))
+        lit('LiquAdj_exp._component'),
+        lit('LiquAdj_exp._VALUE')
     ).alias('LiquAdj_exp')
 )
 
