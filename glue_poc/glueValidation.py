@@ -7,8 +7,17 @@ root = tree.getroot()
 
 # Extract header information
 report_name = root.attrib['name']
-exch_name = root.find('.//exchNam').text
-rpt_cod = root.find('.//rptCod').text
+exch_name_elem = root.find('.//exchNam')
+if exch_name_elem is not None:
+    exch_name = exch_name_elem.text
+else:
+    exch_name = ''
+
+rpt_cod_elem = root.find('.//rptCod')
+if rpt_cod_elem is not None:
+    rpt_cod = rpt_cod_elem.text
+else:
+    rpt_cod = ''
 
 # Create CSV file
 with open('output.csv', 'w', newline='') as csvfile:
