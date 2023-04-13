@@ -13,3 +13,6 @@ def get_all_columns(schema, prefix=''):
 # Assuming df is your PySpark DataFrame
 all_columns = get_all_columns(df.schema)
 print(all_columns)
+
+
+filtered_dict = {k: v for k, v in my_dict.items() if v.startswith('ArrayType[string]')}
