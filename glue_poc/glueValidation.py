@@ -1,38 +1,61 @@
-from pyspark.sql.functions import explode, flatten, array, struct, concat_ws, concat, lit
+import xml.etree.ElementTree as ET
+import csv
 
-# Load the XML data
-xml_data = spark.read.format('xml').option('rowTag', 'Report').load('path/to/xml_file.xml')
+# Parse XML file
+tree = ET.parse('input.xml')
+root = tree.getroot()
 
-# Convert the DataFrame to a format that can be flattened
-xml_string = concat_ws('', *[concat(lit('<'), col('_name'), lit('>'), col('_VALUE'), lit('</'), col('_name'), lit('>')) for col in xml_data.schema.fields])
-converted_data = xml_data.select(struct(xml_string).alias('xmls'))
+# Extract header information
+report_name = root.attrib['name']
+exch_name = root.find('.//exchNam').text
+rpt_cod = root.find('.//rptCod').text
 
-# Flatten the nested columns
-flattened_data = spark.read.option("rowTag", "root").xml(converted_data.rdd.map(lambda r: r.xmls))
+# Create CSV file
+with open('output.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
 
-flattened_data = flattened_data.select(flatten(flattened_data.schema.names))
+    # Write header row
+    writer.writerow(['Report Name', 'Exchange Name', 'Report Code', 'Member Legal Name', 'Member ID',
+                     'Account Type Name', 'Liquidation Group Name', 'Current Market Component Name',
+                     'Market Risk Aggr T', 'Market Risk Aggr T-1', 'LiquAdj Component Name', 'LiquAdj Value'])
 
-# Explode arrays
-exploded_data = flattened_data.select('*', explode(flattened_data.acctTyGrp).alias('acctTyGrp_exp'))
-exploded_data = exploded_data.select('*', explode(exploded_data.acctTyGrp_exp.LiquidationGrp).alias('LiquidationGrp_exp'))
-exploded_data = exploded_data.select('*', explode(exploded_data.LiquidationGrp_exp.currMarComp.LiquAdj).alias('LiquAdj_exp'))
+    # Loop through reportNameGrp elements
+    for cm_rc in root.findall('.//reportNameGrp/*'):
 
-# Select only the necessary columns
-output_data = exploded_data.select(
-    'rptHdr.exchNam',
-    'rptHdr.rptCod',
-    'reportNameGrp.cm.rptSubHdr.membLglNam',
-    'reportNameGrp.cm.rptSubHdr.membId',
-    'acctTyGrp_exp._Name',
-    'LiquidationGrp_exp._Name',
-    'currMarComp._Name',
-    'MarketRisk_Aggr_T',
-    'MarketRisk_Aggr_T-1',
-    struct(
-        lit('LiquAdj_exp._component'),
-        lit('LiquAdj_exp._VALUE')
-    ).alias('LiquAdj_exp')
-)
+        # Extract member legal name and ID
+        memb_lgl_nam = cm_rc.find('.//membLglNam').text
+        memb_id = cm_rc.find('.//membId').text
 
-# Write the output to a CSV file
-output_data.write.csv('path/to/output_file.csv', header=True)
+        # Loop through acctTyGrp elements
+        for acct_ty_grp in cm_rc.findall('.//acctTyGrp'):
+
+            # Extract account type name
+            acct_ty_name = acct_ty_grp.attrib['Name']
+
+            # Loop through LiquidationGrp elements
+            for liq_grp in acct_ty_grp.findall('.//LiquidationGrp'):
+
+                # Extract Liquidation group name
+                liq_grp_name = liq_grp.attrib['Name']
+
+                # Loop through currMarComp elements
+                for curr_mar_comp in liq_grp.findall('.//currMarComp'):
+
+                    # Extract current market component name
+                    curr_mar_comp_name = curr_mar_comp.attrib['Name']
+
+                    # Extract MarketRisk_Aggr_T and MarketRisk_Aggr_T-1 values
+                    mkt_risk_aggr_t = curr_mar_comp.find('.//MarketRisk_Aggr_T').text
+                    mkt_risk_aggr_t_1 = curr_mar_comp.find('.//MarketRisk_Aggr_T-1').text
+
+                    # Loop through LiquAdj elements
+                    for liq_adj in curr_mar_comp.findall('.//LiquAdj'):
+
+                        # Extract LiquAdj component name and value
+                        liq_adj_comp_name = liq_adj.get('component', '')
+                        liq_adj_val = liq_adj.text
+
+                        # Write row to CSV file
+                        writer.writerow([report_name, exch_name, rpt_cod, memb_lgl_nam, memb_id,
+                                         acct_ty_name, liq_grp_name, curr_mar_comp_name,
+                                         mkt_risk_aggr_t, mkt_risk_aggr_t_1, liq_adj_comp_name, liq_adj_val])
