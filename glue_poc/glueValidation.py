@@ -1,23 +1,20 @@
-from pyspark.sql.types import StructType
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
 
-def get_all_columns(schema, prefix=''):
-    columns = []
-    for field in schema.fields:
-        name = prefix + field.name
-        if isinstance(field.dataType, StructType):
-            columns += get_all_columns(field.dataType, name + '.')
-        else:
-            columns.append(name)
-    return columns
+spark = SparkSession.builder.appName("Excel to CSV").getOrCreate()
 
-# Assuming df is your PySpark DataFrame
-all_columns = get_all_columns(df.schema)
-print(all_columns)
+df = spark.read.format("com.crealytics.spark.excel") \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .load("/path/to/excel/file.xlsx")
+
+df.write.format("csv") \
+    .option("header", "true") \
+    .save("/path/to/csv/file.csv")
 
 
-filtered_dict = {k: v for k, v in my_dict.items() if  v.startswith('ArrayType[string]')}
-
-
-for i, k in enumerate(my_dict):
-    key_list = [k2 for k2 in my_dict.keys() if k2 != k]
-    print(f"{k}: {key_list}")
+<dependency>
+<groupId>com.crealytics</groupId>
+<artifactId>spark-excel_2.12</artifactId>
+<version>0.13.7</version>
+</dependency>
