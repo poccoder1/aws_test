@@ -1,20 +1,59 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, FloatType
 
-spark = SparkSession.builder.appName("Excel to CSV").getOrCreate()
-
-df = spark.read.format("com.crealytics.spark.excel") \
-    .option("header", "true") \
-    .option("inferSchema", "true") \
-    .load("/path/to/excel/file.xlsx")
-
-df.write.format("csv") \
-    .option("header", "true") \
-    .save("/path/to/csv/file.csv")
-
-
-<dependency>
-<groupId>com.crealytics</groupId>
-<artifactId>spark-excel_2.12</artifactId>
-<version>0.13.7</version>
-</dependency>
+schema = StructType([
+    StructField("Batch", StructType([
+        StructField("PostRpt", StructType([
+            StructField("@RptID", StringType()),
+            StructField("@BizDt", DateType()),
+            StructField("@SetPx", FloatType()),
+            StructField("Pty", StructType([
+                StructField("@ID", StringType()),
+                StructField("@R", IntegerType()),
+                StructField("Sub", StructType([
+                    StructField("@ID", IntegerType()),
+                    StructField("@Typ", StringType())
+                ]))
+            ])),
+            StructField("Instrmt", StructType([
+                StructField("@ID", StringType()),
+                StructField("@SecTyp", StringType()),
+                StructField("@MMY", StringType()),
+                StructField("@Exch", StringType()),
+                StructField("@UOM", StringType())
+            ])),
+            StructField("Qty", StructType([
+                StructField("@Long", IntegerType()),
+                StructField("@Short", IntegerType()),
+                StructField("@Typ", StringType())
+            ])),
+            StructField("Amt", StructType([
+                StructField("@Typ", StringType()),
+                StructField("@Amt", FloatType()),
+                StructField("@Ccy", StringType())
+            ]))
+        ])),
+        StructField("TrdCaptRpt", StructType([
+            StructField("@RptID", StringType()),
+            StructField("@BizDt", DateType()),
+            StructField("Instrmt", StructType([
+                StructField("@ID", StringType()),
+                StructField("@Fctr", IntegerType())
+            ])),
+            StructField("Amt", StructType([
+                StructField("@Typ", StringType()),
+                StructField("@Amt", FloatType()),
+                StructField("@Ccy", StringType())
+            ])),
+            StructField("Pty", StructType([
+                StructField("@ID", StringType()),
+                StructField("@R", IntegerType()),
+                StructField("Sub", StructType([
+                    StructField("@ID", IntegerType()),
+                    StructField("@Typ", StringType())
+                ]))
+            ])),
+            StructField("RegTrdID", StructType([
+                StructField("@ID", StringType())
+            ]))
+        ]))
+    ]))
