@@ -1,24 +1,23 @@
 import json
 from pyspark.sql.functions import substring
 
-# read the JSON configuration
-with open('/path/to/config.json', 'r') as f:
+# Read the JSON schema definition from the config file
+with open('config.json') as f:
     config = json.load(f)
 
-# define the schema based on the configuration
-schema = []
-start_index = 0
-for col_name, col_len in config['Fix_Delimited']['schemaDefinitionLength'].items():
-    end_index = start_index + col_len
-    schema.append((col_name, substring('value', start_index, col_len).alias(col_name)))
-    start_index = end_index
+schema = config['Fix_Delimited']['schemaDefinitionLength']
 
-# read the text file data
-data = spark.read.text('/path/to/textfile.txt')
+# Define the start and end indices for each column
+indices = [0]
+for col_len in schema.values():
+    indices.append(indices[-1] + col_len)
 
-# apply the schema to create columns
-for col_name, col_expr in schema:
-    data = data.withColumn(col_name, col_expr)
+# Read the text file into a DataFrame
+text_data = spark.read.text('path/to/text/file')
 
-# show the resulting dataframe
-data.show()
+# Create columns based on the schema definition
+for i, (col_name, col_len) in enumerate(schema.items(), start=1):
+    start_idx, end_idx = indices[i-1], indices[i]
+    text_data = text_data.withColumn(col_name, substring('value', start_idx+1, col_len))
+
+text_data.show()
