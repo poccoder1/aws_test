@@ -1,5 +1,7 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import substring, when
+from pyspark.sql.functions import substring
+
+import json
 
 # Create SparkSession
 spark = SparkSession.builder.appName("Fix_Delimited_Extractor").getOrCreate()
@@ -8,10 +10,11 @@ spark = SparkSession.builder.appName("Fix_Delimited_Extractor").getOrCreate()
 data = spark.read.text("<path_to_text_file>")
 
 # Read the config.json file
-config = spark.read.json("<path_to_config_file>")
+with open("config.json") as f:
+    config_data = json.load(f)
 
 # Extract schema definition length from config file
-schema_definition_length = config.select("extractor.Fix_Delimited.schemaDefinitionLength").collect()[0][0]
+schema_definition_length = config_data["extractor"]["Fix_Delimited"]["schemaDefinitionLength"]
 
 # Define the schema based on schema definition length
 schema = ""
@@ -23,15 +26,10 @@ schema = schema[:-2]
 
 # Create dataframe with extracted columns
 df = data.select(
-    *[when(length(data.value) >= sum([schema_definition_length[key] for key in schema_definition_length.keys() if key < col]) + value,
-           substring(data.value, sum([schema_definition_length[key] for key in schema_definition_length.keys() if key < col]) + 1, value))
-          .otherwise(None)
+    *[substring(data.value, sum([schema_definition_length[key] for key in schema_definition_length.keys() if key < col]) + 1, value)
           .alias(col)
       for col, value in schema_definition_length.items()]
 )
-
-# Filter out null values
-df = df.filter(df[col].isNotNull())
 
 # Create a temporary view
 df.createOrReplaceTempView("temp_table")
