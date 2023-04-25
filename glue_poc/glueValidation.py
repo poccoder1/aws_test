@@ -1,42 +1,43 @@
-import sys
-from awsglue.transforms import *
-from awsglue.utils import getResolvedOptions
-from pyspark.context import SparkContext
-from awsglue.context import GlueContext
-from awsglue.dynamicframe import DynamicFrame
-from pyspark.sql.functions import col
-import redis
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import substring, when
 
-# Get Glue job arguments
-args = getResolvedOptions(sys.argv, ['JOB_NAME', 's3_input_path', 's3_output_path', 'elastic_cache_endpoint'])
+# Create SparkSession
+spark = SparkSession.builder.appName("Fix_Delimited_Extractor").getOrCreate()
 
-# Initialize Spark and Glue contexts
-sc = SparkContext()
-glue_context = GlueContext(sc)
-spark = glue_context.spark_session
+# Read the text file
+data = spark.read.text("<path_to_text_file>")
 
-# Connect to ElastiCache Redis cluster
-r = redis.StrictRedis(host=args['elastic_cache_endpoint'], port=6379, db=0)
+# Read the config.json file
+config = spark.read.json("<path_to_config_file>")
 
-# Read CSV file from S3 and convert to DataFrame
-input_dyf = glue_context.create_dynamic_frame_from_options(
-    's3',
-    {'paths': [args['s3_input_path']], 'format': 'csv', 'csvFirstRowIsHeader': 'true', 'delimiter': ','}
+# Extract schema definition length from config file
+schema_definition_length = config.select("extractor.Fix_Delimited.schemaDefinitionLength").collect()[0][0]
+
+# Define the schema based on schema definition length
+schema = ""
+for key, value in schema_definition_length.items():
+    schema += key + " string, "
+
+# Remove trailing comma and space
+schema = schema[:-2]
+
+# Create dataframe with extracted columns
+df = data.select(
+    *[when(length(data.value) >= sum([schema_definition_length[key] for key in schema_definition_length.keys() if key < col]) + value,
+           substring(data.value, sum([schema_definition_length[key] for key in schema_definition_length.keys() if key < col]) + 1, value))
+          .otherwise(None)
+          .alias(col)
+      for col, value in schema_definition_length.items()]
 )
-input_df = input_dyf.toDF()
 
-# Fetch data from Redis cache and convert to DataFrame
-redis_data = r.get('your-key')
-redis_df = spark.read.json(sc.parallelize([redis_data]))
+# Filter out null values
+df = df.filter(df[col].isNotNull())
 
-# Merge data from CSV and Redis
-merged_df = input_df.join(redis_df, on='join_column')
+# Create a temporary view
+df.createOrReplaceTempView("temp_table")
 
-# Write merged data to S3 as CSV file
-merged_dyf = DynamicFrame.fromDF(merged_df, glue_context, 'merged_dyf')
-glue_context.write_dynamic_frame.from_options(
-    frame=merged_dyf,
-    connection_type='s3',
-    connection_options={'path': args['s3_output_path']},
-    format='csv'
-)
+# Select the columns in the desired order
+final_df = spark.sql("SELECT " + schema + " FROM temp_table")
+
+# Show the final dataframe
+final_df.show()
