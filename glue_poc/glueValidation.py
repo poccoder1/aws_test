@@ -18,24 +18,31 @@ schema_definition_length = config_data["extractor"]["Fix_Delimited"]["schemaDefi
 
 # Define the schema based on schema definition length
 schema = ""
+start_index = 0
 for key, value in schema_definition_length.items():
-    schema += key + " string, "
+    end_index = start_index + value
+    schema += f"{key} string, "
+    start_index = end_index
 
 # Remove trailing comma and space
 schema = schema[:-2]
 
 # Create dataframe with extracted columns
-df = data.select(
-    *[substring(data.value, sum([schema_definition_length[key] for key in schema_definition_length.keys() if key < col]) + 1, value)
-          .alias(col)
-      for col, value in schema_definition_length.items()]
-)
+cols = []
+for col, value in schema_definition_length.items():
+    end_index = start_index + value
+    if end_index > len(data.value):
+        raise ValueError(f"End index for {col} column exceeds the length of the input string")
+    cols.append(substring(data.value, start_index + 1, end_index).alias(col))
+    start_index = end_index
+
+df = data.select(cols)
 
 # Create a temporary view
 df.createOrReplaceTempView("temp_table")
 
 # Select the columns in the desired order
-final_df = spark.sql("SELECT " + schema + " FROM temp_table")
+final_df = spark.sql(f"SELECT {schema} FROM temp_table")
 
 # Show the final dataframe
 final_df.show()
