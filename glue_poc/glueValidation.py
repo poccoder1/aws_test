@@ -1,5 +1,5 @@
 import json
-from pyspark.sql.functions import substring
+from pyspark.sql.functions import substring, length, when
 
 # Read the JSON schema definition from the config file
 with open('config.json') as f:
@@ -18,6 +18,7 @@ text_data = spark.read.text('path/to/text/file')
 # Create columns based on the schema definition
 for i, (col_name, col_len) in enumerate(schema.items(), start=1):
     start_idx, end_idx = indices[i-1], indices[i]
-    text_data = text_data.withColumn(col_name, substring('value', start_idx+1, col_len))
+    text_data = text_data.withColumn(col_name, when(length('value') >= end_idx, substring('value', start_idx+1, col_len)).otherwise(None))
 
-text_data.show()
+# Write the DataFrame to a CSV file
+text_data.write.format('csv').option('header', True).save('path/to/output/file.csv')
