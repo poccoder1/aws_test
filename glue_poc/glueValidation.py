@@ -1,48 +1,24 @@
-from pyspark.sql import SparkSession
+import json
 from pyspark.sql.functions import substring
 
-import json
+# read the JSON configuration
+with open('/path/to/config.json', 'r') as f:
+    config = json.load(f)
 
-# Create SparkSession
-spark = SparkSession.builder.appName("Fix_Delimited_Extractor").getOrCreate()
-
-# Read the text file
-data = spark.read.text("<path_to_text_file>")
-
-# Read the config.json file
-with open("config.json") as f:
-    config_data = json.load(f)
-
-# Extract schema definition length from config file
-schema_definition_length = config_data["extractor"]["Fix_Delimited"]["schemaDefinitionLength"]
-
-# Define the schema based on schema definition length
-schema = ""
+# define the schema based on the configuration
+schema = []
 start_index = 0
-for key, value in schema_definition_length.items():
-    end_index = start_index + value
-    schema += f"{key} string, "
+for col_name, col_len in config['Fix_Delimited']['schemaDefinitionLength'].items():
+    end_index = start_index + col_len
+    schema.append((col_name, substring('value', start_index, col_len).alias(col_name)))
     start_index = end_index
 
-# Remove trailing comma and space
-schema = schema[:-2]
+# read the text file data
+data = spark.read.text('/path/to/textfile.txt')
 
-# Create dataframe with extracted columns
-cols = []
-for col, value in schema_definition_length.items():
-    end_index = start_index + value
-    if end_index > len(data.value):
-        raise ValueError(f"End index for {col} column exceeds the length of the input string")
-    cols.append(substring(data.value, start_index + 1, end_index).alias(col))
-    start_index = end_index
+# apply the schema to create columns
+for col_name, col_expr in schema:
+    data = data.withColumn(col_name, col_expr)
 
-df = data.select(cols)
-
-# Create a temporary view
-df.createOrReplaceTempView("temp_table")
-
-# Select the columns in the desired order
-final_df = spark.sql(f"SELECT {schema} FROM temp_table")
-
-# Show the final dataframe
-final_df.show()
+# show the resulting dataframe
+data.show()
