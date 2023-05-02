@@ -1,31 +1,49 @@
-import json
-from pyspark.sql.functions import substring, length, when
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
 
-# Read the JSON schema definition from the config file
-with open('config.json') as f:
-    config = json.load(f)
+# Create a GlueContext
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
 
-schema = config['Fix_Delimited']['schemaDefinitionLength']
-skip_first_row = config['Fix_Delimited']['skipFirstRow']
+# Get the job parameters
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
 
-# Define the start and end indices for each column
-indices = [0]
-for col_len in schema.values():
-    indices.append(indices[-1] + col_len)
+# Create a DynamicFrame from the input .gz files
+input_path = "s3://your-bucket/input-folder/*.gz"
 
-# Read the text file into a DataFrame, skipping the first row if specified in the schema
-if skip_first_row:
-    text_data = spark.read.text('path/to/text/file', wholetext=True).rdd.zipWithIndex().filter(lambda x: x[1] > 0).map(lambda x: x[0]).toDF()
-else:
-    text_data = spark.read.text('path/to/text/file')
+input_paths = [
+    "s3://your-bucket/input-folder/file1.gz",
+    "s3://your-bucket/input-folder/file2.gz",
+    "s3://your-bucket/input-folder/file3.gz"
+]
+datasource = glueContext.create_dynamic_frame.from_options(
+    connection_type="s3",
+    format="csv",
+    connection_options={"paths": [input_path]},
+    format_options={"compression": "gzip"},
+    transformation_ctx="datasource"
+)
 
-# Create columns based on the schema definition
-for i, (col_name, col_len) in enumerate(schema.items(), start=1):
-    start_idx, end_idx = indices[i-1], indices[i]
-    text_data = text_data.withColumn(col_name, when(length('value') >= end_idx, substring('value', start_idx+1, col_len)).otherwise(None))
+# Merge the CSV files into a single DynamicFrame
+merged_frame = ApplyMapping.apply(
+    frame=datasource,
+    mappings=[
+        # Specify your column mappings if needed
+    ],
+    transformation_ctx="merged_frame"
+)
 
-# Drop the 'value' column
-text_data = text_data.drop('value')
-
-# Write the DataFrame to a CSV file
-text_data.write.format('csv').option('header', True).save('path/to/output/file.csv')
+# Write the merged DynamicFrame to a single CSV file
+output_path = "s3://your-bucket/output-folder/merged.csv"
+glueContext.write_dynamic_frame.from_options(
+    frame=merged_frame,
+    connection_type="s3",
+    connection_options={"path": output_path},
+    format="csv",
+    format_options={"compression": "gzip"},
+    transformation_ctx="output"
+)
