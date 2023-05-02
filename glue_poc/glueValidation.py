@@ -1,49 +1,37 @@
-import sys
-from awsglue.transforms import *
-from awsglue.utils import getResolvedOptions
-from pyspark.context import SparkContext
-from awsglue.context import GlueContext
+import boto3
+import pandas as pd
+import gzip
 
-# Create a GlueContext
-sc = SparkContext()
-glueContext = GlueContext(sc)
-spark = glueContext.spark_session
+# Initialize AWS Glue context and S3 client
+glueContext = GlueContext(SparkContext.getOrCreate())
+s3_client = boto3.client('s3')
 
-# Get the job parameters
-args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+# Define the S3 bucket and file paths for input and output
+bucket_name = 'your-bucket-name'
+input_files = ['file1.gz', 'file2.gz', 'file3.gz']
+output_file = 'merged_file.csv'
 
-# Create a DynamicFrame from the input .gz files
-input_path = "s3://your-bucket/input-folder/*.gz"
+# Function to read gzipped CSV file from S3 and return DataFrame
+def read_csv_from_s3(bucket, file_path):
+    s3_object = s3_client.get_object(Bucket=bucket, Key=file_path)
+    gzipped_content = s3_object['Body'].read()
+    content = gzip.decompress(gzipped_content)
+    df = pd.read_csv(content)
+    return df
 
-input_paths = [
-    "s3://your-bucket/input-folder/file1.gz",
-    "s3://your-bucket/input-folder/file2.gz",
-    "s3://your-bucket/input-folder/file3.gz"
-]
-datasource = glueContext.create_dynamic_frame.from_options(
-    connection_type="s3",
-    format="csv",
-    connection_options={"paths": [input_path]},
-    format_options={"compression": "gzip"},
-    transformation_ctx="datasource"
-)
+# List to hold individual DataFrames
+dfs = []
 
-# Merge the CSV files into a single DynamicFrame
-merged_frame = ApplyMapping.apply(
-    frame=datasource,
-    mappings=[
-        # Specify your column mappings if needed
-    ],
-    transformation_ctx="merged_frame"
-)
+# Read each gzipped CSV file and add its DataFrame to the list
+for file in input_files:
+    df = read_csv_from_s3(bucket_name, file)
+    dfs.append(df)
 
-# Write the merged DynamicFrame to a single CSV file
-output_path = "s3://your-bucket/output-folder/merged.csv"
-glueContext.write_dynamic_frame.from_options(
-    frame=merged_frame,
-    connection_type="s3",
-    connection_options={"path": output_path},
-    format="csv",
-    format_options={"compression": "gzip"},
-    transformation_ctx="output"
-)
+# Concatenate all DataFrames into a single DataFrame
+merged_df = pd.concat(dfs, ignore_index=True)
+
+# Convert the merged DataFrame to CSV
+output_csv = merged_df.to_csv(index=False)
+
+# Write the merged CSV file to S3
+s3_client.put_object(Body=output_csv, Bucket=bucket_name, Key=output_file)
