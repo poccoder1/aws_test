@@ -11,7 +11,7 @@ public class FileDownloadStatusManager {
         return fileStatusMap.getOrDefault(fileName, false);
     }
 
-    public void setFileDownloaded(String fileName, boolean downloaded) {
+    public void setFileDownloaded(String fileName, FileState downloaded) {
         fileStatusMap.put(fileName, downloaded);
     }
 
@@ -24,6 +24,7 @@ public class FileDownloadStatusManager {
     @Scheduled(cron = "0 0 0 * * ?") // Runs daily at midnight
     public void resetProperties() {
         fileDownloadStatusManager.resetStatus();
+        resetData fileDetails
         // Reset any other properties or data structures as needed
     }
 
@@ -54,31 +55,32 @@ import org.springframework.scheduling.annotation.Async;
 @Component
 public class FileDownloadScheduler {
 
-    private static final long SCHEDULER_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-    private final FileRepository fileRepository;
-    private final RestTemplate restTemplate;
-    private final DownloadService downloadService;
 
-    public FileDownloadScheduler(FileRepository fileRepository, RestTemplate restTemplate, DownloadService downloadService) {
-        this.fileRepository = fileRepository;
-        this.restTemplate = restTemplate;
-        this.downloadService = downloadService;
+    List<FileDetails>  fileList = fromDb;
+    private Map<String, FileState> fileStatusMap = new ConcurrentHashMap<>();
+    // state: Downloading, Download_complete
+
+    @Scheduled(cron = SCHEDULER_INTERVAL_MS) // Runs every 10 min
+    public void scheduleFile() {
+
+        for(FileDetails file: fileDetails){
+
+            if(days_to_Run, Start_time, end_time, fileStatusMap.get("file")){
+                        kafkaPublish(file,fileStatusMap)
+            }
+         }
     }
 
-    @Async
-    @Scheduled(fixedDelay = SCHEDULER_INTERVAL_MS)
-    public void runScheduler() {
-        // Get the files to download
-        List<File> filesToDownload = fileRepository.getFilesToDownload();
+    public void kafkaPublish(){
+        try{
 
-        for (File file : filesToDownload) {
-            // Check if the file is already being downloaded
-            if (!downloadService.isDownloading(file.getId())) {
-                // Call the download service asynchronously
-                downloadService.downloadFileAsync(file.getId());
-            }
+            kakfkaTemplate.send(file)
+            fileStatusMap.put(fileName, Downloading)
+        }catch(Exc){
+            fileStatusMap.remove(fileName);
         }
     }
+
 }
 
 
