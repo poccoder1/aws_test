@@ -1,0 +1,10 @@
+Connection_details:
+connection_id, HostName, Port, user, password, limit
+
+FileType_Connection:
+FileType_Connection_Id, batch_id, file_Type, connection_id,
+
+
+File_Details:
+File_Details_Id, FileType_Connection_Id, FileName, days_to_Run, Start_time, end_time
+
