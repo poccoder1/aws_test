@@ -1,37 +1,95 @@
-import boto3
-import pandas as pd
-import gzip
+import sys
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from pyspark.sql import SparkSession
+import json
 
-# Initialize AWS Glue context and S3 client
-glueContext = GlueContext(SparkContext.getOrCreate())
-s3_client = boto3.client('s3')
+# Create a Glue context
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
 
-# Define the S3 bucket and file paths for input and output
-bucket_name = 'your-bucket-name'
-input_files = ['file1.gz', 'file2.gz', 'file3.gz']
-output_file = 'merged_file.csv'
+# Set up Glue job parameters
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 's3_input_path', 's3_output_path'])
 
-# Function to read gzipped CSV file from S3 and return DataFrame
-def read_csv_from_s3(bucket, file_path):
-    s3_object = s3_client.get_object(Bucket=bucket, Key=file_path)
-    gzipped_content = s3_object['Body'].read()
-    content = gzip.decompress(gzipped_content)
-    df = pd.read_csv(content)
-    return df
+# Read CSV file from S3
+input_path = args['s3_input_path']
+data_frame = glueContext.create_dynamic_frame.from_options(
+    connection_type="s3",
+    connection_options={"paths": [input_path]},
+    format="csv",
+    format_options={"withHeader": True}
+)
 
-# List to hold individual DataFrames
-dfs = []
+# Define the JSON schema
+json_schema = {
+    "data": {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "Name": {
+                    "type": "object",
+                    "properties": {
+                        "First_Name": {"type": "string"},
+                        "Middle_Name": {"type": "string"},
+                        "Last_Name": {"type": "string"}
+                    },
+                    "required": ["First_Name", "Last_Name"]
+                },
+                "Address": {
+                    "type": "object",
+                    "properties": {
+                        "Address_Line1": {"type": "string"},
+                        "Address_Line2": {"type": "string"},
+                        "Address_Line3": {"type": "string"},
+                        "city": {"type": "string"},
+                        "state": {"type": "string"},
+                        "pin_code": {"type": "string"}
+                    },
+                    "required": ["Address_Line1", "city", "state", "pin_code"]
+                }
+            },
+            "required": ["Name", "Address"]
+        }
+    }
+}
 
-# Read each gzipped CSV file and add its DataFrame to the list
-for file in input_files:
-    df = read_csv_from_s3(bucket_name, file)
-    dfs.append(df)
+# Generate CSV schema based on JSON schema
+def process_schema(schema, parent_key=''):
+    csv_schema = []
+    for key, value in schema.items():
+        current_key = f"{parent_key}.{key}" if parent_key else key
+        if value.get('type') == 'object':
+            nested_schema = value.get('properties', {})
+            nested_csv_schema = process_schema(nested_schema, parent_key=current_key)
+            csv_schema.extend(nested_csv_schema)
+        else:
+            csv_schema.append((current_key, value.get('type')))
+    return csv_schema
 
-# Concatenate all DataFrames into a single DataFrame
-merged_df = pd.concat(dfs, ignore_index=True)
+csv_schema = process_schema(json_schema['data']['items']['properties'])
 
-# Convert the merged DataFrame to CSV
-output_csv = merged_df.to_csv(index=False)
+# Convert CSV to JSON using the provided schema
+json_data_frame = ApplyMapping.apply(
+    frame=data_frame,
+    mappings=[
+        (column_name, column_type, column_name.replace(".", "_"))
+        for column_name, column_type in csv_schema
+    ]
+)
 
-# Write the merged CSV file to S3
-s3_client.put_object(Body=output_csv, Bucket=bucket_name, Key=output_file)
+# Write JSON data frame to S3
+output_path = args['s3_output_path']
+glueContext.write_dynamic_frame.from_options(
+    frame=json_data_frame,
+    connection_type="s3",
+    connection_options={"path": output_path},
+    format="json",
+    format_options={"jsonSchema": json.dumps(json_schema)}
+)
+
+# Commit the job and exit
+job.commit()
