@@ -84,3 +84,17 @@ public class FileDownloadScheduler {
 }
 
 
+  Input list of string  ["YMCA OF GREATER DAYTON",
+            "YMCA OF GREATER ST",
+            "YMCA OF GREATER WEST",
+            "BETTER BUSINESS BUREAU OF",
+            "BETTER BUSINESS BUREAU SE",
+            "BETTER BUSINESS BUREAU","java is promgramming","apple"]
+
+output: expected in map key String and value as list of string
+["YMCA OF GREATER": ["YMCA OF GREATER DAYTON", "YMCA OF GREATER ST", "YMCA OF GREATER WEST",],
+"BETTER BUSINESS BUREAU" : ["BETTER BUSINESS BUREAU OF","BETTER BUSINESS BUREAU SE","BETTER BUSINESS BUREAU"] ,
+"java is promgramming": ["java is promgramming"]  ,
+            "apple": ["apple"]
+]
+

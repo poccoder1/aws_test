@@ -8,3 +8,10 @@ FileType_Connection_Id, batch_id, file_Type, connection_id,
 File_Details:
 File_Details_Id, FileType_Connection_Id, FileName, days_to_Run, Start_time, end_time
 
+
+
+First_Name, Middle_Name, Last_Name, Address_Line1, Address_Line2, Address_Line3, city, state, pin_code
+Mark, G, xyz, line1, line2, line3, pune, mh, 470118
+smith, B,pqr , line11, line22, line33, pune, mh, 470117
+
+
