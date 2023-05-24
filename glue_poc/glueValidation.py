@@ -54,9 +54,25 @@ json_schema = {
 }
 
 # Convert CSV to JSON using the provided schema
-json_data_frame = data_frame.selectExpr(
-    json.dumps(json_schema) + " AS json_schema",
-    "to_json(named_struct('Name', named_struct('First_Name', First_Name, 'Middle_Name', Middle_Name, 'Last_Name', Last_Name), 'Address', named_struct('Address_Line1', Address_Line1, 'Address_Line2', Address_Line2, 'Address_Line3', Address_Line3, 'city', city, 'state', state, 'pin_code', pin_code))) AS json_data"
+json_data_frame = data_frame.withColumn(
+    "json_data",
+    functions.to_json(
+        functions.struct(
+            functions.struct(
+                functions.col("First_Name").alias("First_Name"),
+                functions.col("Middle_Name").alias("Middle_Name"),
+                functions.col("Last_Name").alias("Last_Name")
+            ).alias("Name"),
+            functions.struct(
+                functions.col("Address_Line1").alias("Address_Line1"),
+                functions.col("Address_Line2").alias("Address_Line2"),
+                functions.col("Address_Line3").alias("Address_Line3"),
+                functions.col("city").alias("city"),
+                functions.col("state").alias("state"),
+                functions.col("pin_code").alias("pin_code")
+            ).alias("Address")
+        )
+    )
 )
 
 # Write JSON data frame to S3
@@ -66,7 +82,7 @@ glueContext.write_dynamic_frame.from_options(
     connection_type="s3",
     connection_options={"path": output_path},
     format="json",
-    format_options={"jsonSchema": json_schema}
+    format_options={"jsonSchema": json.dumps(json_schema)}
 )
 
 # Commit the job and exit
