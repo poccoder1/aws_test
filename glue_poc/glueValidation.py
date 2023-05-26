@@ -2,6 +2,8 @@ AWS Glue is a fully managed extract, transform, and load (ETL) service provided 
 
 Use Cases of AWS Glue:
 
+1. Data Preparation and ETL: AWS Glue simplifies the process of transforming and cleaning data to make it suitable for analysis. It offers a visual ETL interface and a rich set of transformation capabilities, such as filtering, mapping, aggregating, and joining data. Glue generates Scala or Python code based on your transformations, which can be optimized and executed at scale.
+
 Data Integration: Glue can be used to integrate data from various sources, such as databases, data lakes, and streaming platforms. It enables you to transform and combine data from different formats and structures into a unified format for analysis and processing.
 
 Data Warehousing: Glue can extract data from various sources and load it into a data warehouse such as Amazon Redshift or Amazon Athena. It automates the schema discovery process and performs transformations to ensure data compatibility with the target data warehouse.
