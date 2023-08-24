@@ -245,3 +245,67 @@ class CSVServiceTest {
         // Verify the result and other expectations as needed
     }
 }
+
+
+
+=========================
+
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
+class CSVControllerTest {
+
+    private MockMvc mockMvc;
+
+    @Mock
+    private CSVService csvService;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.initMocks(this);
+        CSVController csvController = new CSVController(csvService);
+        mockMvc = MockMvcBuilders.standaloneSetup(csvController).build();
+    }
+
+    @Test
+    void testMapCSVToObject() throws Exception {
+        // Mock CSV data
+        List<MyData> mockDataList = new ArrayList<>();
+        MyData data1 = new MyData();
+        data1.setColumn1("Value1");
+        data1.setColumn2("Value2");
+        mockDataList.add(data1);
+
+        // Mock CSVService behavior
+        when(csvService.mapCSVToObject(eq("test.csv"), any())).thenReturn(mockDataList);
+
+        // Perform the GET request to the /map-csv endpoint
+        MockHttpServletResponse response = mockMvc
+            .perform(MockMvcRequestBuilders.get("/map-csv")
+                .param("csvFilePath", "test.csv")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andReturn()
+            .getResponse();
+
+        // Verify that CSVService was called and returned the expected data
+        // Verify the response content, status code, or other expectations as needed
+    }
+}
