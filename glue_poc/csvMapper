@@ -1,0 +1,184 @@
+import com.opencsv.bean.CsvToBean;
+import com.opencsv.bean.CsvToBeanBuilder;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.List;
+
+@Service
+@Slf4j
+public class CSVService {
+    public <T> List<T> mapCSVToObject(String csvFilePath, Class<T> clazz) throws IOException {
+        log.info("Mapping CSV file: {}", csvFilePath);
+
+        FileReader reader = new FileReader(csvFilePath);
+
+        CsvToBean<T> csvToBean = new CsvToBeanBuilder<T>(reader)
+                .withType(clazz)
+                .withIgnoreLeadingWhiteSpace(true)
+                .build();
+
+        List<T> dataList = csvToBean.parse();
+
+        log.info("Mapping complete. {} records found.", dataList.size());
+
+        return dataList;
+    }
+}
+
+
+==================
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.io.IOException;
+import java.util.List;
+
+@RestController
+@Slf4j
+public class CSVController {
+    private final CSVService csvService;
+
+    @Autowired
+    public CSVController(CSVService csvService) {
+        this.csvService = csvService;
+    }
+
+    @GetMapping("/map-csv")
+    public List<MyData> mapCSVToObject(@RequestParam String csvFilePath) throws IOException {
+        log.info("Mapping CSV file: {}", csvFilePath);
+
+        List<MyData> dataList = csvService.mapCSVToObject(csvFilePath, MyData.class);
+
+        log.info("Mapping complete. {} records found.", dataList.size());
+
+        return dataList;
+    }
+}
+
+
+====================
+
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
+
+@ExtendWith({ SpringExtension.class, MockitoExtension.class })
+@WebMvcTest(CSVController.class)
+class CSVControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private CSVService csvService;
+
+    @Test
+    void testMapCSVToObject() throws Exception {
+        // Mock CSV data
+        List<MyData> mockDataList = new ArrayList<>();
+        MyData data1 = new MyData();
+        data1.setColumn1("Value1");
+        data1.setColumn2("Value2");
+        mockDataList.add(data1);
+
+        // Mock CSVService behavior
+        when(csvService.mapCSVToObject(eq("test.csv"), any())).thenReturn(mockDataList);
+
+        // Perform the GET request to the /map-csv endpoint
+        MockHttpServletResponse response = mockMvc
+            .perform(MockMvcRequestBuilders.get("/map-csv")
+                .param("csvFilePath", "test.csv")
+                .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(MockMvcResultMatchers.status().isOk())
+            .andReturn()
+            .getResponse();
+
+        // Verify that CSVService was called and returned the expected data
+        verify(csvService).mapCSVToObject(eq("test.csv"), any());
+
+        // Add more assertions as needed based on your application's behavior
+    }
+}
+
+
+
+==================
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class CSVServiceTest {
+
+    @InjectMocks
+    private CSVService csvService;
+
+    @Mock
+    private CSVMapper csvMapper;
+
+    @BeforeEach
+    void setUp() {
+        // Initialize any necessary setup before each test case
+    }
+
+    @Test
+    void testMapCSVToObject() throws IOException {
+        // Mock CSV data
+        List<MyData> mockDataList = new ArrayList<>();
+        MyData data1 = new MyData();
+        data1.setColumn1("Value1");
+        data1.setColumn2("Value2");
+        mockDataList.add(data1);
+
+        // Mock CSVMapper behavior
+        when(csvMapper.mapCSVToObject(eq("test.csv"), any())).thenReturn(mockDataList);
+
+        // Call the method being tested
+        List<MyData> result = csvService.mapCSVToObject("test.csv", MyData.class);
+
+        // Verify that CSVMapper was called and returned the expected data
+        verify(csvMapper).mapCSVToObject(eq("test.csv"), any());
+
+        // Add more assertions as needed based on your service's behavior
+    }
+}
