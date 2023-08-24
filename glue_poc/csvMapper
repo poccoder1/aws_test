@@ -182,3 +182,66 @@ class CSVServiceTest {
         // Add more assertions as needed based on your service's behavior
     }
 }
+
+
+============================
+
+
+import com.opencsv.bean.CsvToBean;
+import com.opencsv.bean.CsvToBeanBuilder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+class CSVServiceTest {
+
+    @InjectMocks
+    private CSVService csvService;
+
+    @Mock
+    private CsvToBeanBuilder<MyData> csvToBeanBuilder;
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    void testMapCSVToObject() throws IOException {
+        // Mock CSV data
+        List<MyData> mockDataList = new ArrayList<>();
+        MyData data1 = new MyData();
+        data1.setColumn1("Value1");
+        data1.setColumn2("Value2");
+        mockDataList.add(data1);
+
+        // Mock dependencies
+        FileReader mockFileReader = mock(FileReader.class);
+        CsvToBean<MyData> mockCsvToBean = mock(CsvToBean.class);
+
+        when(mockFileReader.read()).thenReturn(-1); // Simulate EOF for the FileReader
+
+        when(csvToBeanBuilder.withType(MyData.class)).thenReturn(csvToBeanBuilder);
+        when(csvToBeanBuilder.withIgnoreLeadingWhiteSpace(true)).thenReturn(csvToBeanBuilder);
+        when(csvToBeanBuilder.build()).thenReturn(mockCsvToBean);
+        when(mockCsvToBean.parse()).thenReturn(mockDataList);
+
+        // Call the method being tested
+        List<MyData> result = csvService.mapCSVToObject("test.csv", MyData.class);
+
+        // Verify that dependencies were called and returned the expected data
+        // Verify the result and other expectations as needed
+    }
+}
