@@ -86,3 +86,65 @@ public class CSVController {
         }
     }
 }
+
+
+=================
+
+        import org.junit.jupiter.api.BeforeEach;
+        import org.junit.jupiter.api.Test;
+        import org.mockito.InjectMocks;
+        import org.mockito.Mock;
+        import org.mockito.MockitoAnnotations;
+        import org.springframework.core.io.Resource;
+        import org.springframework.core.io.ResourceLoader;
+
+        import java.io.ByteArrayInputStream;
+        import java.io.IOException;
+        import java.nio.charset.StandardCharsets;
+
+        import static org.junit.jupiter.api.Assertions.assertEquals;
+        import static org.mockito.Mockito.when;
+
+public class CSVFileMappingConfigurationTest {
+
+    @InjectMocks
+    private CSVFileMappingConfiguration configuration;
+
+    @Mock
+    private ResourceLoader resourceLoader;
+
+    @Mock
+    private Resource resource;
+
+    @BeforeEach
+    public void setup() {
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    public void testLoadFileMappings() throws IOException {
+        // Define the content of the feed.config file
+        String configFileContent = "file1=com.example.PojoClass1\nfile2=com.example.PojoClass2\n";
+
+        // Create a ByteArrayInputStream to simulate the resource
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(configFileContent.getBytes(StandardCharsets.UTF_8));
+
+        // Mock the resourceLoader to return the ByteArrayInputStream when loading the resource
+        when(resourceLoader.getResource("classpath:/feed.config")).thenReturn(resource);
+        when(resource.getInputStream()).thenReturn(inputStream);
+
+        // Load file mappings
+        configuration.loadFileMappings();
+
+        // Verify that mappings are loaded correctly
+        assertEquals("com.example.PojoClass1", configuration.getPojoClassNameForFile("file1"));
+        assertEquals("com.example.PojoClass2", configuration.getPojoClassNameForFile("file2"));
+    }
+
+    @Test
+    public void testGetPojoClassNameForFile_NotFound() {
+        // Test when the file mapping is not found
+        assertEquals(null, configuration.getPojoClassNameForFile("nonExistentFile"));
+    }
+}
+
