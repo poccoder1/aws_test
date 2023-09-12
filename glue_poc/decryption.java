@@ -180,3 +180,19 @@ public class DecryptAndSaveExcel {
         }
     }
 }
+======
+
+
+
+        I hope this email finds you well. I am writing to bring to your attention an issue we have been facing with decrypting the files you've shared with us recently. It appears that there may have been a change in your encryption logic after September 6th.
+
+        We have been successfully decrypting files that were shared with us prior to that date using the previous encryption method. However, this same method is no longer working for the new files you've sent us.
+
+        To resolve this matter promptly, I kindly request that you liaise with your IT team to investigate the issue and potentially revert to the encryption process we were using before September 6th. If there have been any updates or changes to the encryption method, we would appreciate receiving the necessary information or files to ensure successful decryption.
+
+        Alternatively, if you believe it would be more expedient, we are open to scheduling a call with your IT team to address this matter directly. This would allow us to collaborate and find a solution as quickly as possible, minimizing any disruption to our workflow.
+
+        Please let us know how you would like to proceed, and we are committed to working together to resolve this issue swiftly. Your prompt attention to this matter is greatly appreciated.
+
+        Thank you for your cooperation.
+
