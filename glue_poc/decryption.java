@@ -196,3 +196,24 @@ public class DecryptAndSaveExcel {
 
         Thank you for your cooperation.
 
+=================
+
+        Subject: Re: Issue with Encryption Method for Files Shared after September 6th
+
+        Dear [Sender's Name],
+
+        Thank you for getting back to us promptly, and I appreciate your understanding of the urgency of this matter. I want to clarify that the issue we're experiencing with file decryption does not appear to be related to the password length; rather, it seems to be connected to a change in the encryption method used by your IT team after September 6th.
+
+        To resolve this issue, I believe it's crucial to identify the encryption algorithm that was employed prior to September 6th, as our existing decryption method is no longer compatible. If you could kindly liaise with your IT team to retrieve this information, it would be greatly appreciated.
+
+        Moreover, we are more than willing to collaborate with your IT team to ensure a smooth resolution. If they require any specific inputs or details from our end, please let us know, and we will promptly provide the necessary information. Setting up a call to discuss this matter in detail would be a constructive step towards finding a solution as quickly as possible, and we are open to this option.
+
+        The current situation is impacting our workflow and causing delays in processing the files, as we are forced to handle them manually. We understand the importance of resolving this issue swiftly, and we are committed to working closely with you to achieve that goal.
+
+        Once again, thank you for your assistance in addressing this matter. Please do not hesitate to reach out with any further information or to arrange a suitable time for a call with your IT team.
+
+        Best regards,
+
+        [Your Name]
+        [Your Position]
+        [Your Contact Information]
