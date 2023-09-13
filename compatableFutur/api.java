@@ -146,3 +146,50 @@ public class AccountServiceImplTest {
         assertEquals(0, result.size());
     }
 }
+
+
+
+==================
+
+        import java.lang.reflect.Field;
+        import java.util.*;
+        import java.util.concurrent.CompletableFuture;
+        import java.util.stream.Collectors;
+
+public class AccountProcessor {
+    public Map<String, Map<String, Object>> processAccounts(List<CompletableFuture<List<Account>>> futures) {
+        // Wait for all CompletableFuture objects to complete and collect their results
+        List<List<Account>> accountLists = futures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
+
+        // Create the result map
+        Map<String, Map<String, Object>> resultMap = new HashMap<>();
+
+        // Iterate through the list of Account objects and organize data into the map
+        for (List<Account> accounts : accountLists) {
+            for (Account account : accounts) {
+                String accountId = account.getAccountId();
+
+                // Create or update the outer map with accountId
+                resultMap.computeIfAbsent(accountId, k -> new HashMap<>());
+
+                // Get all the fields of the Account class using reflection
+                Field[] fields = Account.class.getDeclaredFields();
+
+                // Iterate through the fields and add them to the inner map with their values
+                for (Field field : fields) {
+                    field.setAccessible(true);
+                    try {
+                        Object value = field.get(account);
+                        resultMap.get(accountId).put(field.getName(), value);
+                    } catch (IllegalAccessException e) {
+                        e.printStackTrace(); // Handle the exception as needed
+                    }
+                }
+            }
+        }
+
+        return resultMap;
+    }
+}
