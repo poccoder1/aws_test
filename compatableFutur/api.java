@@ -193,3 +193,32 @@ public class AccountProcessor {
         return resultMap;
     }
 }
+
+
+===========operation on map=====
+
+
+        Map<String, Map<String, Object>> resultMap = ... // Your map
+
+        for (Map.Entry<String, Map<String, Object>> entry : resultMap.entrySet()) {
+        String accountId = entry.getKey();
+        Map<String, Object> innerMap = entry.getValue();
+
+        for (Map.Entry<String, Object> innerEntry : innerMap.entrySet()) {
+        String fieldName = innerEntry.getKey();
+        Object value = innerEntry.getValue();
+
+        if (value instanceof String) {
+        String stringValue = (String) value;
+        // Handle string value
+        System.out.println(fieldName + " is a String: " + stringValue);
+        } else if (value instanceof List) {
+        List<String> listValue = (List<String>) value;
+        // Handle list value
+        System.out.println(fieldName + " is a List<String>: " + listValue);
+        } else {
+        // Handle other types if needed
+        System.out.println(fieldName + " has an unsupported type: " + value.getClass().getSimpleName());
+        }
+        }
+        }
