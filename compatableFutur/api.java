@@ -222,3 +222,163 @@ public class AccountProcessor {
         }
         }
         }
+
+
+
+        ============skip=====
+
+
+        import org.junit.jupiter.api.BeforeEach;
+        import org.junit.jupiter.api.Test;
+        import org.mockito.InjectMocks;
+        import org.mockito.Mock;
+        import org.mockito.MockitoAnnotations;
+
+        import java.util.ArrayList;
+        import java.util.HashMap;
+        import java.util.List;
+        import java.util.Map;
+        import java.util.concurrent.CompletableFuture;
+
+        import static org.junit.jupiter.api.Assertions.assertEquals;
+        import static org.mockito.Mockito.*;
+
+public class RDcTest {
+
+    @InjectMocks
+    private RDc rDc;
+
+    @Mock
+    private RefFactory factory;
+
+    @Mock
+    private Iaccoun iaccoun;
+
+    @BeforeEach
+    public void setUp() {
+        // Initialize Mockito mocks
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    public void testFetchAll() {
+        // Prepare test data
+        String accountId = "1";
+        List<String> accountIds = new ArrayList<>();
+        accountIds.add(accountId);
+
+        Map<String, CompletableFuture<List<RefDataAccount>>> mockMap = new HashMap<>();
+        CompletableFuture<List<RefDataAccount>> mockFuture = new CompletableFuture<>();
+        mockMap.put(accountId, mockFuture);
+
+        // Mock the behavior of factory.getAccountService()
+        when(factory.getAccountService()).thenReturn(iaccoun);
+
+        // Mock the behavior of iaccoun.getAccountByCCP(id)
+        when(iaccoun.getAccountByCCP(accountId)).thenReturn(new ArrayList<>());
+
+        // Mock the behavior of callRDC method
+        when(rDc.callRDC(accountId)).thenReturn(mockFuture);
+
+        // Create a spy for the RDc instance
+        RDc rDcSpy = spy(rDc);
+
+        // Mock the behavior of callRDC method without actually calling it
+        when(rDcSpy.callRDC(accountId)).thenReturn(mockFuture);
+
+        // Call the method under test
+        Map<String, AccountDetails> result = rDcSpy.fetchAll();
+
+        // Verify the result
+        assertEquals(new HashMap<>(), result);
+
+        // Verify that callRDC was not called
+        verify(rDcSpy, never()).callRDC(accountId);
+    }
+}
+
+
+=====all===
+
+
+        import org.junit.jupiter.api.BeforeEach;
+        import org.junit.jupiter.api.Test;
+        import org.mockito.InjectMocks;
+        import org.mockito.Mock;
+        import org.mockito.MockitoAnnotations;
+        import org.springframework.beans.factory.annotation.Autowired;
+
+        import java.util.ArrayList;
+        import java.util.HashMap;
+        import java.util.List;
+        import java.util.Map;
+        import java.util.concurrent.CompletableFuture;
+
+        import static org.junit.jupiter.api.Assertions.assertEquals;
+        import static org.mockito.Mockito.*;
+
+public class RDcTest {
+
+    @InjectMocks
+    private RDc rDc;
+
+    @Mock
+    private RefFactory factory;
+
+    @Mock
+    private Iaccoun iaccoun;
+
+    @BeforeEach
+    public void setUp() {
+        // Initialize Mockito mocks
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    public void testCallRDC() {
+        // Prepare test data
+        String accountId = "1";
+        List<RefDataAccount> testData = new ArrayList<>();
+        testData.add(new RefDataAccount());
+
+        // Mock the behavior of factory.getAccountService()
+        when(factory.getAccountService()).thenReturn(iaccoun);
+
+        // Mock the behavior of iaccoun.getAccountByCCP(id)
+        when(iaccoun.getAccountByCCP(accountId)).thenReturn(testData);
+
+        // Call the method under test
+        CompletableFuture<List<RefDataAccount>> result = rDc.callRDC(accountId);
+
+        // Verify the result
+        assertEquals(testData, result.join());
+    }
+
+    @Test
+    public void testFetchAll() {
+        // Prepare test data
+        String accountId = "1";
+        List<String> accountIds = new ArrayList<>();
+        accountIds.add(accountId);
+
+        Map<String, CompletableFuture<List<RefDataAccount>>> mockMap = new HashMap<>();
+        CompletableFuture<List<RefDataAccount>> mockFuture = new CompletableFuture<>();
+        mockMap.put(accountId, mockFuture);
+
+        // Mock the behavior of factory.getAccountService()
+        when(factory.getAccountService()).thenReturn(iaccoun);
+
+        // Mock the behavior of iaccoun.getAccountByCCP(id)
+        when(iaccoun.getAccountByCCP(accountId)).thenReturn(new ArrayList<>());
+
+        // Mock the behavior of callRDC method
+        when(rDc.callRDC(accountId)).thenReturn(mockFuture);
+
+        // Call the method under test
+        Map<String, AccountDetails> result = rDc.fetchAll();
+
+        // Verify the result
+        assertEquals(new HashMap<>(), result);
+    }
+}
+
