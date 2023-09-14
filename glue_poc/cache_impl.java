@@ -49,15 +49,14 @@ public class AccountService {
 @Service
 public class ExternalApiService {
 
-    private final String externalApiUrl = "YOUR_EXTERNAL_API_URL";
+    private final ExternalApi api;
 
-    public Map<String, Account> fetchAllAccounts() {
-        RestTemplate restTemplate = new RestTemplate();
-        // Make a REST API call to fetch all accounts
-        // Map the response to Map<String, Account>
-        // Example: Map<String, Account> accounts = restTemplate.getForObject(externalApiUrl, Map.class);
-        // Note: Replace the above line with the actual API call and response mapping logic.
-        return accounts;
+
+    public completedFuture<List<ApiResponse> fetchAllAccounts() {
+        ExternalApiRes res = api.getService();
+        List<ApiResponse> response = res.call("test");
+
+        return CompatableFuture.completedFuture(response);
     }
 }
 
@@ -233,8 +232,6 @@ public class ExternalApiServiceTest {
     @Autowired
     private ExternalApiService externalApiService;
 
-    @MockBean
-    private RestTemplateBuilder restTemplateBuilder;
 
     @Test
     public void testFetchAllAccounts() {
@@ -297,5 +294,58 @@ public class CacheRefreshSchedulerTest {
 
         // Verify that the refreshAccountCache method was called exactly once
         verify(accountService, times(1)).refreshAccountCache();
+    }
+}
+
+
+============new test
+
+
+        import org.junit.jupiter.api.BeforeEach;
+        import org.junit.jupiter.api.Test;
+        import org.mockito.InjectMocks;
+        import org.mockito.Mock;
+        import org.mockito.MockitoAnnotations;
+
+        import java.util.Arrays;
+        import java.util.List;
+        import java.util.concurrent.CompletableFuture;
+
+        import static org.junit.jupiter.api.Assertions.assertEquals;
+        import static org.mockito.Mockito.*;
+
+public class ExternalApiServiceTest {
+
+    @InjectMocks
+    private ExternalApiService externalApiService;
+
+    @Mock
+    private ExternalApi externalApi;
+
+    @BeforeEach
+    public void setUp() {
+        // Initialize Mockito mocks
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    public void testFetchAllAccounts() {
+        // Prepare test data
+        ExternalApiRes externalApiRes = new ExternalApiRes();
+        List<ApiResponse> testData = Arrays.asList(new ApiResponse("1", "John"), new ApiResponse("2", "Doe"));
+
+        // Mock external API behavior
+        when(externalApi.getService()).thenReturn(externalApiRes);
+        when(externalApiRes.call("test")).thenReturn(testData);
+
+        // Call the method under test
+        CompletableFuture<List<ApiResponse>> result = externalApiService.fetchAllAccounts();
+
+        // Verify that the external API service was called
+        verify(externalApi, times(1)).getService();
+        verify(externalApiRes, times(1)).call("test");
+
+        // Verify the result
+        assertEquals(testData, result.join());
     }
 }
