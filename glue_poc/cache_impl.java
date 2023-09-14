@@ -256,3 +256,46 @@ public class ExternalApiServiceTest {
 
     // Similar tests for fetchAccountById can be added
 }
+
+
+
+==================test
+
+
+        import org.junit.jupiter.api.BeforeEach;
+        import org.junit.jupiter.api.Test;
+        import org.mockito.InjectMocks;
+        import org.mockito.Mock;
+        import org.mockito.MockitoAnnotations;
+        import org.springframework.scheduling.annotation.Scheduled;
+
+        import static org.mockito.Mockito.*;
+
+public class CacheRefreshSchedulerTest {
+
+    @InjectMocks
+    private CacheRefreshScheduler cacheRefreshScheduler;
+
+    @Mock
+    private AccountService accountService;
+
+    @BeforeEach
+    public void setUp() {
+        // Initialize mockito mocks
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    public void testRefreshCacheScheduled() {
+        // Assuming that the @Scheduled cron expression runs at midnight
+
+        // Mock the behavior of refreshAccountCache method
+        doNothing().when(accountService).refreshAccountCache();
+
+        // Manually invoke the scheduled method (since it's scheduled at midnight)
+        cacheRefreshScheduler.refreshCache();
+
+        // Verify that the refreshAccountCache method was called exactly once
+        verify(accountService, times(1)).refreshAccountCache();
+    }
+}
