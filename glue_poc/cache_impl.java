@@ -349,3 +349,52 @@ public class ExternalApiServiceTest {
         assertEquals(testData, result.join());
     }
 }
+
+
+=========cacheconfig=====
+
+        import com.github.benmanes.caffeine.cache.Caffeine;
+        import org.junit.jupiter.api.BeforeEach;
+        import org.junit.jupiter.api.Test;
+        import org.mockito.InjectMocks;
+        import org.mockito.Mock;
+        import org.mockito.MockitoAnnotations;
+        import org.springframework.cache.CacheManager;
+        import org.springframework.cache.caffeine.CaffeineCacheManager;
+
+        import java.util.concurrent.TimeUnit;
+
+        import static org.junit.jupiter.api.Assertions.assertEquals;
+        import static org.mockito.Mockito.when;
+
+public class CacheConfigTest {
+
+    @InjectMocks
+    private CacheConfig cacheConfig;
+
+    @Mock
+    private Caffeine<Object, Object> caffeine;
+
+    @BeforeEach
+    public void setUp() {
+        // Initialize Mockito mocks
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    public void testCacheManager() {
+        // Create a CaffeineCacheManager
+        CaffeineCacheManager expectedCacheManager = new CaffeineCacheManager();
+        expectedCacheManager.setCaffeine(caffeine);
+
+        // Mock the behavior of caffeineConfig to return the configured Caffeine object
+        when(caffeine.expireAfterWrite(300, TimeUnit.SECONDS)).thenReturn(caffeine);
+        when(caffeine.initialCapacity(10)).thenReturn(caffeine);
+
+        // Call the method under test
+        CacheManager result = cacheConfig.cacheManager(caffeine);
+
+        // Verify that the result is the expected CaffeineCacheManager
+        assertEquals(expectedCacheManager, result);
+    }
+}
