@@ -1,0 +1,40 @@
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+
+import java.util.Map;
+
+public interface EnricherService {
+    Dataset<Row> enrich(Map<String, Object> enricherConfig, Dataset<Row> inputDataset);
+}
+
+
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
+@Service
+@Qualifier("DATA_MANIPULATION_ENRICHER")
+public class DataManipulationEnricherServiceImpl implements EnricherService {
+
+    @Override
+    public Dataset<Row> enrich(Map<String, Object> enricherConfig, Dataset<Row> inputDataset) {
+        String sqlQuery = (String) enricherConfig.get("sql");
+        inputDataset.createOrReplaceTempView("tempView");
+        return inputDataset.sqlContext().sql(sqlQuery);
+    }
+}
+
+@Service
+@Qualifier("BUSINESS_DATE_ENRICHER")
+public class BusinessDateEnricherServiceImpl implements EnricherService {
+
+    @Override
+    public Dataset<Row> enrich(Map<String, Object> enricherConfig, Dataset<Row> inputDataset) {
+        // Implement business date enrichment logic
+        // You can use inputDataset and enricherConfig parameters to perform specific logic
+        // For example, add a new column with a business date based on certain conditions
+        return inputDataset.withColumn("business_date", functions.current_date());
+    }
+}
