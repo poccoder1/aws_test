@@ -1,0 +1,8 @@
+mvn deploy:deploy-file \
+  -DgroupId=com.example \
+  -DartifactId=my-archive \
+  -Dversion=1.0.0 \
+  -Dpackaging=tar.gz \
+  -Dfile=~/my-files/my-archive.tar.gz \
+  -DrepositoryId=my-nexus-repo \
+  -Durl=http://localhost:8081/repository/maven-releases/
