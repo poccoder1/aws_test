@@ -6,3 +6,13 @@ mvn deploy:deploy-file \
   -Dfile=~/my-files/my-archive.tar.gz \
   -DrepositoryId=my-nexus-repo \
   -Durl=http://localhost:8081/repository/maven-releases/
+
+
+mvn deploy:deploy-file \
+  -DgroupId=net.com.gcs3 \
+  -DartifactId=k8s-zookeeper \
+  -Dversion=3.8.4 \
+  -Dpackaging=tar.gz \
+  -Dfile=C:/download/apache-zookeeper-3.8.4-bin.tar.gz \
+  -DrepositoryId=artifactory \
+  -Durl=https://artifacorty-read.gkp.com.net/artifactory/maven
