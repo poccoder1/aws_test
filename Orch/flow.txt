@@ -1,0 +1,497 @@
+Here's a simplified outline of the interaction between the orchestration service and GFD:
+
+AIM triggers GFD for a specific batch.
+GFD starts and enters the file-checking loop.
+GFD notifies the orchestration service (via API) that it has started processing batch X.
+GFD checks for the file every 10 minutes.
+Once GFD downloads the file, it notifies the orchestration service.
+The orchestration service triggers the next step (GFF, GFP, GCS3) based on the workflow.
+
+================
+
+This table defines the possible workflows and the sequence of services for each file_type. You can expand this table as needed to accommodate new workflows.
+
+CREATE TABLE workflow (
+    workflow_id INT PRIMARY KEY,
+    workflow_name VARCHAR(255),  -- Example: 'GFD -> GFF -> GCS3'
+    description TEXT             -- Description of the workflow
+);
+
+=================
+
+This table will map each file_type to a specific workflow. When the orchestration service starts processing a batch, it will check this table to determine which workflow applies to the file type being processed.
+
+CREATE TABLE file_type_workflow (
+    file_type VARCHAR(255) PRIMARY KEY,  -- The file type, e.g., 'file_type1'
+    workflow_id INT,                     -- Workflow assigned to the file type
+    FOREIGN KEY (workflow_id) REFERENCES workflow(workflow_id)
+);
+
+
+=============
+
+Workflow Steps Table
+This table will define the individual steps (services) within each workflow and the order in which they should be executed. This way, the orchestration service can sequentially trigger each service based on the workflow.
+
+CREATE TABLE workflow_steps (
+    workflow_step_id INT PRIMARY KEY,
+    workflow_id INT,                      -- Foreign key to the workflow table
+    step_order INT,                       -- The order in which the service should be called (1, 2, 3, etc.)
+    service_name VARCHAR(255),            -- Name of the service, e.g., 'GFD', 'GFF', 'GCS3', 'GFP'
+    action VARCHAR(255),                  -- Action to perform, e.g., 'download', 'process', 'publish'
+    FOREIGN KEY (workflow_id) REFERENCES workflow(workflow_id)
+);
+
+
+Example Data:::
+
+INSERT INTO workflow (workflow_id, workflow_name) VALUES (1, 'GFD -> GFF -> GCS3');
+INSERT INTO workflow (workflow_id, workflow_name) VALUES (2, 'GFD -> GFF -> GFP -> GCS3');
+
+INSERT INTO file_type_workflow (file_type, workflow_id) VALUES ('file_type1', 1);
+INSERT INTO file_type_workflow (file_type, workflow_id) VALUES ('file_type2', 2);
+
+INSERT INTO workflow_steps (workflow_id, step_order, service_name, action) VALUES (1, 1, 'GFD', 'download');
+INSERT INTO workflow_steps (workflow_id, step_order, service_name, action) VALUES (1, 2, 'GFF', 'process');
+INSERT INTO workflow_steps (workflow_id, step_order, service_name, action) VALUES (1, 3, 'GCS3', 'publish');
+
+INSERT INTO workflow_steps (workflow_id, step_order, service_name, action) VALUES (2, 1, 'GFD', 'download');
+INSERT INTO workflow_steps (workflow_id, step_order, service_name, action) VALUES (2, 2, 'GFF', 'process');
+INSERT INTO workflow_steps (workflow_id, step_order, service_name, action) VALUES (2, 3, 'GFP', 'etl_process');
+INSERT INTO workflow_steps (workflow_id, step_order, service_name, action) VALUES (2, 4, 'GCS3', 'publish');
+
+
+================
+
+Batch Processing Status Table
+This table will track the status of each batch, each file type within the batch, and which stage in the workflow it is currently at. This is useful for monitoring progress and troubleshooting.
+
+Batch Processing Status Table:
+
+CREATE TABLE batch_status (
+    batch_id INT,                         -- The ID of the batch
+    file_type VARCHAR(255),               -- File type being processed
+    workflow_id INT,                      -- Foreign key to the workflow table
+    business_date DATE,                   -- The business date for this process
+    version INT,                          -- Version number to track multiple runs of the same batch
+    current_step_order INT,               -- The current step in the workflow (1 for GFD, 2 for GFF, etc.)
+    status VARCHAR(50),                   -- Current status, e.g., 'In Progress', 'Completed', 'Failed'
+    last_updated TIMESTAMP,               -- When the status was last updated
+    PRIMARY KEY (batch_id, file_type, business_date, version),  -- Composite primary key to allow multiple versions
+    FOREIGN KEY (workflow_id) REFERENCES workflow(workflow_id)
+);
+
+
+======
+2. How Versioning Works
+Each time a batch is triggered, the system will check if a record already exists for that batch_id, file_type, and business_date.
+If a record exists, it will create a new entry with an incremented version number.
+This way, multiple runs of the same batch can be tracked independently.
+3. How to Use This Table
+Initial Insert for a New Batch Run: When a new batch starts, you insert a record in the batch_status table with version = 1 if it’s the first run on that day. If the batch is retried or re-triggered on the same day, the version will increment:
+
+-- Check the latest version for the batch, file_type, and business_date
+SELECT COALESCE(MAX(version), 0) + 1 AS new_version
+FROM batch_status
+WHERE batch_id = 123 AND file_type = 'file_type1' AND business_date = '2024-09-22';
+
+-- Insert a new record with the incremented version number
+INSERT INTO batch_status (batch_id, file_type, workflow_id, business_date, version, current_step_order, status, last_updated)
+VALUES (123, 'file_type1', 1, '2024-09-22', new_version, 1, 'In Progress', CURRENT_TIMESTAMP);
+
+===
+Updating the Status as the Workflow Progresses: As the orchestration service progresses through the workflow steps, you can update the current_step_order and status based on the batch_id, file_type, business_date, and version:
+
+UPDATE batch_status
+SET current_step_order = 2, status = 'In Progress', last_updated = CURRENT_TIMESTAMP
+WHERE batch_id = 123 AND file_type = 'file_type1' AND business_date = '2024-09-22' AND version = 1;
+
+
+==
+
+Monitoring the Latest Version: To monitor the latest version of a batch for a given business date, you can query the table for the maximum version:
+SELECT * FROM batch_status
+WHERE batch_id = 123 AND file_type = 'file_type1' AND business_date = '2024-09-22'
+ORDER BY version DESC
+LIMIT 1;
+====
+
+4. Example Workflow with Versioning
+Scenario:
+Batch ID: 123
+File Type: 'file_type1'
+Business Date: '2024-09-22'
+First Trigger:
+1.. AIM triggers Batch 123 for file_type1 on '2024-09-22'.
+
+The workflow is GFD -> GFF -> GCS3.
+version = 1 since it's the first trigger for this batch and file type on the business date.
+INSERT INTO batch_status (batch_id, file_type, workflow_id, business_date, version, current_step_order, status, last_updated)
+VALUES (123, 'file_type1', 1, '2024-09-22', 1, 1, 'In Progress', CURRENT_TIMESTAMP);
+
+2.. Orchestration progresses:
+GFD completes, GFF starts:
+
+UPDATE batch_status
+SET current_step_order = 2, status = 'In Progress', last_updated = CURRENT_TIMESTAMP
+WHERE batch_id = 123 AND file_type = 'file_type1' AND business_date = '2024-09-22' AND version = 1;
+
+
+Second Trigger:
+
+The same batch and file type are triggered again later in the day.
+version = 2 for this new run.
+
+INSERT INTO batch_status (batch_id, file_type, workflow_id, business_date, version, current_step_order, status, last_updated)
+VALUES (123, 'file_type1', 1, '2024-09-22', 2, 1, 'In Progress', CURRENT_TIMESTAMP);
+
+
+5. Status Table Query for Reporting and Monitoring
+You can generate reports to see the status of each batch, including which version is being processed and what step it’s on:
+
+-- Get the latest version of each batch and file type
+SELECT batch_id, file_type, business_date, MAX(version) AS latest_version
+FROM batch_status
+GROUP BY batch_id, file_type, business_date;
+
+-- Get detailed status for a specific batch and file type
+SELECT *
+FROM batch_status
+WHERE batch_id = 123 AND file_type = 'file_type1' AND business_date = '2024-09-22';
+
+====================================Orchestration service==========
+
+In the orchestration service, the goal is to manage and track the workflow of each file type after GFD triggers the download of a file. The orchestration service will act as a central point to decide the flow for each file type and call the required services (like GFF, GFP, GCS3) based on the workflow defined for that file type. Here's how the orchestration can be designed:
+
+1. Components of the Orchestration Service
+a. Triggering the Orchestration from GFD
+Once GFD downloads a file, it will call the orchestration service and pass relevant details such as batch_id, file_type, business_date, and file details.
+The orchestration service will fetch the workflow for that file_type and start executing the steps defined in the workflow.
+b. Fetching Workflow from Database
+The orchestration service will fetch the workflow for the file_type from the workflow_steps table (discussed earlier).
+It will use the step_order to determine which services to call and in what sequence.
+c. Status Update in batch_status Table
+After each step, the orchestration service will update the batch_status table to track the progress of each file_type through the workflow.
+This helps to monitor where the file is in the process and handle retries or errors.
+d. Calling External Services (GFF, GFP, GCS3)
+Based on the workflow, the orchestration service will make REST calls to the appropriate services (like GFF, GFP, and GCS3) to perform specific tasks.
+e. Handling Success and Failures
+The orchestration service will handle success and failure responses from each service and decide whether to move to the next step or retry the current step.
+If a failure occurs, the status will be updated accordingly in the batch_status table.
+
+.
+2.. Detailed Flow of Orchestration Service::::
+
+a.GFD Calls Orchestration for File Download
+
+After GFD downloads a file, it will notify the orchestration service by calling its API (e.g., POST /orchestrate), passing batch_id, file_type, and business_date.
+Example payload from GFD:
+{
+  "batch_id": 123,
+  "file_type": "file_type1",
+  "business_date": "2024-09-22",
+  "file_name": "file1.csv"
+}
+
+b.  Orchestration Fetches Workflow for File Type
+    The orchestration service will query the workflow_steps table to get the steps for the file_type.
+
+    SELECT *
+    FROM workflow_steps
+    WHERE workflow_id = (SELECT workflow_id FROM workflow WHERE file_type = 'file_type1')
+    ORDER BY step_order;
+
+c. Orchestration Starts Executing Workflow Steps
+
+The orchestration service starts processing the steps for the file_type.
+
+d. Calling Services Based on Step Order
+
+Based on the step_order of the workflow, the orchestration service will make REST API calls to external services like GFF, GFP, or GCS3.
+For example:
+
+If the first step is to call GFF, the orchestration service will send the file details to the GFF service.
+POST /gff/process-file
+{
+  "batch_id": 123,
+  "file_type": "file_type1",
+  "business_date": "2024-09-22",
+  "file_name": "file1.csv"
+}
+
+Once GFF completes its operation, GFF will call back the orchestration service with a success or failure message.
+If the workflow defines GFP as the next step (for ETL), the orchestration will trigger GFP after GFF completes.
+
+POST /gfp/process-etl
+{
+  "batch_id": 123,
+  "file_type": "file_type1",
+  "business_date": "2024-09-22",
+  "file_name": "file1.csv"
+}
+
+e. Handling Callbacks and Status Updates:
+After each step, the orchestration service will update the status in the batch_status table.
+
+
+Example status update after GFF completes:
+UPDATE batch_status
+SET current_step_order = 2, status = 'In Progress', last_updated = CURRENT_TIMESTAMP
+WHERE batch_id = 123 AND file_type = 'file_type1' AND business_date = '2024-09-22' AND version = 1;
+
+f. Final Step: Publishing to S3
+
+After all steps in the workflow are completed (including GFF, GFP, etc.), the orchestration service will call GCS3 to publish the file to the S3 bucket.
+POST /gcs3/publish-file
+{
+  "batch_id": 123,
+  "file_type": "file_type1",
+  "business_date": "2024-09-22",
+  "file_name": "file1.csv"
+}
+
+g. Marking the Workflow as Completed
+
+Once the file is successfully published, the orchestration will update the status for the file type as Completed in the batch_status table.
+UPDATE batch_status
+SET status = 'Completed', last_updated = CURRENT_TIMESTAMP
+WHERE batch_id = 123 AND file_type = 'file_type1' AND business_date = '2024-09-22' AND version = 1;
+
+3. Orchestration Service Implementation Details
+
+a  Orchestration API for GFD to Trigger
+  GFD will call the orchestration service after it downloads a file:
+
+  @RestController
+  @RequestMapping("/orchestrate")
+  public class OrchestrationController {
+
+      @Autowired
+      private WorkflowService workflowService;
+
+      @PostMapping("/start")
+      public ResponseEntity<String> startOrchestration(@RequestBody FileProcessRequest request) {
+          // Call the workflow service to start the process
+          workflowService.startWorkflow(request);
+          return ResponseEntity.ok("Orchestration started");
+      }
+  }
+
+
+b. Workflow Service Logic
+This service handles fetching the workflow steps and making calls to external services based on the step order:
+
+@Service
+public class WorkflowService {
+
+    @Autowired
+    private WorkflowRepository workflowRepository;
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    public void startWorkflow(FileProcessRequest request) {
+        List<WorkflowStep> steps = workflowRepository.findWorkflowByFileType(request.getFileType());
+
+        for (WorkflowStep step : steps) {
+            switch (step.getServiceName()) {
+                case "GFF":
+                    callGFFService(request);
+                    break;
+                case "GFP":
+                    callGFPService(request);
+                    break;
+                case "GCS3":
+                    callGCS3Service(request);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown service: " + step.getServiceName());
+            }
+        }
+    }
+
+    private void callGFFService(FileProcessRequest request) {
+        // Call GFF service
+        restTemplate.postForObject("http://gff-service/process-file", request, String.class);
+    }
+
+    private void callGFPService(FileProcessRequest request) {
+        // Call GFP service
+        restTemplate.postForObject("http://gfp-service/process-etl", request, String.class);
+    }
+
+    private void callGCS3Service(FileProcessRequest request) {
+        // Call GCS3 service to publish file
+        restTemplate.postForObject("http://gcs3-service/publish-file", request, String.class);
+    }
+}
+
+
+c. Orchestration Workflow Repository
+This repository will fetch the workflow steps based on the file type:
+
+@Repository
+public interface WorkflowRepository extends JpaRepository<WorkflowStep, Long> {
+
+    @Query("SELECT w FROM WorkflowStep w WHERE w.workflowId = (SELECT wf.workflowId FROM Workflow wf WHERE wf.fileType = :fileType) ORDER BY w.stepOrder")
+    List<WorkflowStep> findWorkflowByFileType(@Param("fileType") String fileType);
+}
+
+
+4. Monitoring and Handling Errors
+The orchestration service will keep track of each step and update the batch_status table after each service call.
+In case of an error in any service, the orchestration can retry the step or mark it as Failed, depending on the business rules.
+
+
+
+
+some refactor code.::
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import java.util.List;
+
+@Service
+public class WorkflowService {
+
+    private static final Logger logger = LoggerFactory.getLogger(WorkflowService.class);
+
+    @Autowired
+    private WorkflowRepository workflowRepository;
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    public void startWorkflow(FileProcessRequest request) {
+        List<WorkflowStep> steps = workflowRepository.findWorkflowByFileType(request.getFileType());
+
+        logger.info("Starting workflow for file_type: {}, batch_id: {}, business_date: {}",
+                request.getFileType(), request.getBatchId(), request.getBusinessDate());
+
+        for (WorkflowStep step : steps) {
+            try {
+                callService(step.getServiceName(), request, step.getUrlPath());
+            } catch (Exception e) {
+                logger.error("Error occurred while executing step_order {} for service {} in batch_id {}: {}",
+                        step.getStepOrder(), step.getServiceName(), request.getBatchId(), e.getMessage());
+                updateBatchStatus(request.getBatchId(), request.getFileType(), "Failed", step.getStepOrder(), request.getBusinessDate());
+                throw new RuntimeException("Workflow execution failed at step_order: " + step.getStepOrder(), e);
+            }
+        }
+
+        logger.info("Completed workflow for file_type: {}, batch_id: {}, business_date: {}",
+                request.getFileType(), request.getBatchId(), request.getBusinessDate());
+    }
+
+    /**
+     * Generic method to call any service based on the workflow step.
+     */
+    private void callService(String serviceName, FileProcessRequest request, String urlPath) {
+        String serviceUrl = getServiceUrl(serviceName, urlPath);
+
+        logger.info("Calling service: {}, url: {}, for batch_id: {}, file_type: {}, business_date: {}",
+                serviceName, serviceUrl, request.getBatchId(), request.getFileType(), request.getBusinessDate());
+
+        ResponseEntity<String> response = restTemplate.postForEntity(serviceUrl, request, String.class);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            logger.info("Successfully completed step for service: {}, batch_id: {}, file_type: {}, business_date: {}",
+                    serviceName, request.getBatchId(), request.getFileType(), request.getBusinessDate());
+        } else {
+            logger.error("Failed to complete step for service: {}, batch_id: {}, file_type: {}, business_date: {}. Status: {}",
+                    serviceName, request.getBatchId(), request.getFileType(), request.getBusinessDate(), response.getStatusCode());
+            throw new RuntimeException("Service call failed for " + serviceName + " with status: " + response.getStatusCode());
+        }
+    }
+
+    /**
+     * Helper method to build the service URL.
+     * Example: http://gff-service/process-file
+     */
+    private String getServiceUrl(String serviceName, String urlPath) {
+        String serviceBaseUrl = getServiceBaseUrl(serviceName);
+        return serviceBaseUrl + urlPath;
+    }
+
+    /**
+     * This method should return the base URL for each service.
+     * The service base URLs can be configured in properties or fetched from service registry (e.g., Eureka).
+     */
+    private String getServiceBaseUrl(String serviceName) {
+        switch (serviceName) {
+            case "GFF":
+                return "http://gff-service";
+            case "GFP":
+                return "http://gfp-service";
+            case "GCS3":
+                return "http://gcs3-service";
+            default:
+                throw new IllegalArgumentException("Unknown service: " + serviceName);
+        }
+    }
+
+    /**
+     * Updates the batch status in the batch_status table.
+     */
+    private void updateBatchStatus(Long batchId, String fileType, String status, Integer stepOrder, String businessDate) {
+        logger.info("Updating batch status: batch_id: {}, file_type: {}, step_order: {}, status: {}, business_date: {}",
+                batchId, fileType, stepOrder, status, businessDate);
+
+        // Assuming you have a BatchStatusRepository to update the status in the database
+        batchStatusRepository.updateStatus(batchId, fileType, status, stepOrder, businessDate);
+    }
+}
+
+
+@Repository
+public interface BatchStatusRepository extends JpaRepository<BatchStatus, Long> {
+
+    @Modifying
+    @Query("UPDATE BatchStatus bs SET bs.status = :status, bs.currentStepOrder = :stepOrder, bs.lastUpdated = CURRENT_TIMESTAMP WHERE bs.batchId = :batchId AND bs.fileType = :fileType AND bs.businessDate = :businessDate")
+    void updateStatus(@Param("batchId") Long batchId, @Param("fileType") String fileType, @Param("status") String status, @Param("stepOrder") Integer stepOrder, @Param("businessDate") String businessDate);
+}
+
+
+
+
+public class FileProcessRequest {
+    private Long batchId;
+    private String fileType;
+    private String businessDate;
+    private String fileName;
+
+    // Getters and setters
+}
+
+
+@Entity
+public class WorkflowStep {
+
+    @Id
+    private Long id;
+    private Integer stepOrder;
+    private String serviceName;
+    private String urlPath;  // e.g., "/process-file" or "/process-etl"
+
+    // Getters and setters
+}
+
+
+@Repository
+public interface WorkflowRepository extends JpaRepository<WorkflowStep, Long> {
+
+    @Query("SELECT w FROM WorkflowStep w WHERE w.workflowId = (SELECT wf.workflowId FROM Workflow wf WHERE wf.fileType = :fileType) ORDER BY w.stepOrder")
+    List<WorkflowStep> findWorkflowByFileType(@Param("fileType") String fileType);
+}
+
+
+
+
+
+
+
+
