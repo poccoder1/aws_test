@@ -1,0 +1,86 @@
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+@Service
+public class FileDownloadService {
+
+    // Executor service to handle asynchronous API calls
+    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+
+    // Synchronized method for downloading a file to ensure only one connection is used
+    public synchronized void downloadFile(String filePath) {
+        // Business logic before download
+        applyBusinessLogic(filePath);
+
+        // Download file logic (Single connection)
+        connectAndDownload(filePath);
+
+        // Validate file after download
+        validateFile(filePath);
+    }
+
+    // Asynchronous method to call external API
+    @Async
+    public CompletableFuture<Void> callExternalApiAndProcessResponse(String filePath) {
+        return CompletableFuture.supplyAsync(() -> {
+            // Call external API and get response
+            String apiResponse = sendApiRequest(filePath);
+
+            // Once API response is received, process it immediately
+            processApiResponse(filePath, apiResponse);
+            return null;
+        }, executorService);
+    }
+
+    // Method to handle the entire file processing flow
+    public void processFiles(List<String> fileList) {
+        // Use parallel stream for processing files
+        fileList.parallelStream()
+            .forEach(filePath -> {
+                // Step 1: Download each file (synchronized)
+                downloadFile(filePath);
+
+                // Step 2: Asynchronously call external API and process response
+                callExternalApiAndProcessResponse(filePath)
+                    .exceptionally(ex -> {
+                        // Handle any API call failures
+                        System.err.println("Error in processing file: " + filePath + ". Error: " + ex.getMessage());
+                        return null;
+                    });
+            });
+    }
+
+    // Example method to apply business logic before download
+    private void applyBusinessLogic(String filePath) {
+        // Pre-download business logic
+    }
+
+    // Example method to connect to the exchange host and download the file
+    private void connectAndDownload(String filePath) {
+        // File download logic
+    }
+
+    // Example method to validate the downloaded file
+    private void validateFile(String filePath) {
+        // File validation logic
+    }
+
+    // Example method to call external API
+    private String sendApiRequest(String filePath) {
+        // Simulate API call
+        return "API response for file: " + filePath;
+    }
+
+    // Method to process API response and apply business logic
+    private void processApiResponse(String filePath, String apiResponse) {
+        // Apply business logic based on the API response
+        System.out.println("Processing API response for file: " + filePath);
+
+        // Additional business logic after receiving API response
+    }
+}
