@@ -1,0 +1,163 @@
+CREATE TABLE file_type_relationships (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    parent_file_type VARCHAR(50),    -- Parent file type (e.g., MTP_RAW)
+    child_file_type VARCHAR(50),     -- Child file type (e.g., MTP_INPUT1)
+    FOREIGN KEY (parent_file_type) REFERENCES file_types(file_type),
+    FOREIGN KEY (child_file_type) REFERENCES file_types(file_type),
+    UNIQUE (parent_file_type, child_file_type)
+);
+
+CREATE TABLE workflow_steps (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    file_type VARCHAR(50),           -- File type (e.g., MTP_RAW, MTP_INPUT1)
+    step_order INT,                  -- Sequence of steps in the workflow (1 = first, 2 = second, etc.)
+    service_name VARCHAR(100),       -- Service to be called in this step (e.g., GFD, GFF, GFP, GCS3)
+    url_path VARCHAR(255),           -- URL or endpoint for calling the service
+    next_file_type VARCHAR(50),      -- The file type after this step (if any, e.g., MTP_INPUT1 -> MTP_OUTPUT)
+    FOREIGN KEY (file_type) REFERENCES file_types(file_type),
+    FOREIGN KEY (next_file_type) REFERENCES file_types(file_type),
+    UNIQUE (file_type, step_order)
+);
+
+CREATE TABLE file_process_status (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT,                  -- ID of the batch
+    file_type VARCHAR(50),            -- File type at this step (e.g., MTP_RAW, MTP_INPUT1)
+    file_name VARCHAR(255),           -- File name at this step (e.g., MTP20240924.csv, MTP_input1.csv)
+    parent_file_type VARCHAR(50),     -- Parent file type (optional, can be NULL for the root file)
+    parent_file_name VARCHAR(255),    -- Parent file name (optional, links child to parent file)
+    step_order INT,                   -- Current step in the workflow (1, 2, 3, etc.)
+    status VARCHAR(50),               -- Status (Pending, In Progress, Completed, Failed)
+    business_date DATE,               -- Business date of the process
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (file_type) REFERENCES file_types(file_type),
+    FOREIGN KEY (parent_file_type) REFERENCES file_types(file_type)
+);
+
+Scenario 1: MTP_RAW -> MTP_INPUT1 -> MTP_OUTPUT
+File Type Relationships:
+MTP_RAW -> MTP_INPUT1
+MTP_INPUT1 -> MTP_OUTPUT
+
+INSERT INTO file_types (file_type, description) VALUES ('MTP_RAW', 'Raw data file');
+INSERT INTO file_types (file_type, description) VALUES ('MTP_INPUT1', 'Input file processed by GFF');
+INSERT INTO file_types (file_type, description) VALUES ('MTP_OUTPUT', 'Output file processed by GFP');
+
+INSERT INTO file_type_relationships (parent_file_type, child_file_type) VALUES ('MTP_RAW', 'MTP_INPUT1');
+INSERT INTO file_type_relationships (parent_file_type, child_file_type) VALUES ('MTP_INPUT1', 'MTP_OUTPUT');
+
+Workflow Steps for MTP_RAW:
+MTP_RAW: GFD -> GFF
+
+INSERT INTO workflow_steps (file_type, step_order, service_name, url_path, next_file_type)
+VALUES ('MTP_RAW', 1, 'GFD', '/gfd/download', 'MTP_RAW');
+
+INSERT INTO workflow_steps (file_type, step_order, service_name, url_path, next_file_type)
+VALUES ('MTP_RAW', 2, 'GFF', '/gff/process', 'MTP_INPUT1');
+
+Workflow Steps for MTP_INPUT1:
+MTP_INPUT1: GFP
+INSERT INTO workflow_steps (file_type, step_order, service_name, url_path, next_file_type)
+VALUES ('MTP_INPUT1', 1, 'GFP', '/gfp/etl', 'MTP_OUTPUT');
+
+
+Workflow Steps for MTP_OUTPUT:
+MTP_OUTPUT: GCS3
+
+INSERT INTO workflow_steps (file_type, step_order, service_name, url_path, next_file_type)
+VALUES ('MTP_OUTPUT', 1, 'GCS3', '/gcs3/publish', null);
+
+
+
+
+Scenario 2: MTP_RAW -> MTP_INPUT1 and MTP_INPUT2
+File Type Relationships:
+MTP_RAW -> MTP_INPUT1
+MTP_RAW -> MTP_INPUT2
+
+
+INSERT INTO file_type_relationships (parent_file_type, child_file_type) VALUES ('MTP_RAW', 'MTP_INPUT2');
+
+Workflow Steps for MTP_INPUT2:
+MTP_INPUT2: GFF -> GCS3
+
+INSERT INTO workflow_steps (file_type, step_order, service_name, url_path, next_file_type)
+VALUES ('MTP_INPUT2', 1, 'GFF', '/gff/process', 'MTP_INPUT2');
+
+INSERT INTO workflow_steps (file_type, step_order, service_name, url_path, next_file_type)
+VALUES ('MTP_INPUT2', 2, 'GCS3', '/gcs3/publish', null);
+
+
+
+Example Monitoring Data
+Consider the following scenario where a file MTP20240924.csv of type MTP_RAW is processed through the workflow:
+
+MTP_RAW -> MTP_INPUT1 -> MTP_OUTPUT
+
+INSERT INTO file_process_status (batch_id, file_type, file_name, parent_file_type, parent_file_name, step_order, status, business_date)
+VALUES (1001, 'MTP_RAW', 'MTP20240924.csv', null, null, 1, 'Completed', '2024-09-24');
+
+INSERT INTO file_process_status (batch_id, file_type, file_name, parent_file_type, parent_file_name, step_order, status, business_date)
+VALUES (1001, 'MTP_INPUT1', 'MTP_input1.csv', 'MTP_RAW', 'MTP20240924.csv', 1, 'Completed', '2024-09-24');
+
+INSERT INTO file_process_status (batch_id, file_type, file_name, parent_file_type, parent_file_name, step_order, status, business_date)
+VALUES (1001, 'MTP_OUTPUT', 'MTP_output.csv', 'MTP_INPUT1', 'MTP_input1.csv', 1, 'In Progress', '2024-09-24');
+
+
+==========================
+Table: file_type_relationships
+
+id	parent_file_type	child_file_type
+1	MTP_RAW	            MTP_INPUT1
+2	MTP_RAW	            MTP_INPUT2
+3	MTP_INPUT1	        MTP_OUTPUT
+4	MTP_INPUT2	        MTP_OUTPUT2
+
+Table: workflow_steps
+
+id	file_type	step_order	service_name	next_file_type
+1	MTP_RAW	    1	        GFD	        	MTP_RAW
+2	MTP_RAW	    2	        GFF	        	MTP_INPUT1
+3	MTP_INPUT1	1	        GFP	        	MTP_OUTPUT
+4	MTP_INPUT2	1	        GFF	        	MTP_INPUT2
+5	MTP_INPUT2	2	        GCS3	    	NULL
+6	MTP_OUTPUT	1	        GCS3	    	NULL
+7	MTP_OUTPUT2	1	        GCS3	    	NULL
+
+Table: file_process_status
+
+id	batch_id	file_type	file_name	        parent_file_type	parent_file_name	step_order	status	    business_date
+1	1001	    MTP_RAW	    MTP20240924.csv	    NULL	            NULL	            1	        Completed	2024-09-24
+2	1001	    MTP_INPUT1	MTP_input1.csv	    MTP_RAW	            MTP20240924.csv	    1	        Completed	2024-09-24
+3	1001	    MTP_OUTPUT	MTP_output.csv	    MTP_INPUT1	        MTP_input1.csv	    1	        Completed	2024-09-24
+4	1002	    MTP_INPUT2	MTP_input2.csv	    MTP_RAW	            MTP20240924.csv	    1	        Completed	2024-09-24
+5	1002	    MTP_OUTPUT2	MTP_output2.csv	    MTP_INPUT2	        MTP_input2.csv	    1	        In Progress	2024-09-24
+
+
+Get all child file types for a given parent file type
+
+SELECT child.file_type, child.description
+FROM file_types parent
+JOIN file_type_relationships rel ON parent.file_type = rel.parent_file_type
+JOIN file_types child ON rel.child_file_type = child.file_type
+WHERE parent.file_type = 'MTP_RAW';
+
+Get workflow monitoring for a parent file and its child files
+
+SELECT fps.file_type, fps.file_name, fps.status, fps.business_date
+FROM file_process_status fps
+JOIN file_type_relationships rel ON fps.file_type = rel.child_file_type OR fps.file_type = rel.parent_file_type
+WHERE rel.parent_file_type = 'MTP_RAW' AND fps.parent_file_name = 'MTP20240924.csv'
+ORDER BY fps.step_order;
+
+3. Check if all child file types for a parent are completed
+SELECT COUNT(*) AS total,
+       SUM(CASE WHEN fps.status = 'Completed' THEN 1 ELSE 0 END) AS completed
+FROM file_process_status fps
+JOIN file_type_relationships rel ON fps.file_type = rel.child_file_type
+WHERE rel.parent_file_type = 'MTP_RAW' AND fps.parent_file_name = 'MTP20240924.csv';
+
+
+
+
+
