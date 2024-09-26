@@ -1,3 +1,17 @@
+CREATE TABLE file_types (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    file_type VARCHAR(50) UNIQUE,   -- File type name (e.g., MTP_RAW, MTP_INPUT1, MTP_OUTPUT)
+    description VARCHAR(255)        -- Optional description of the file type
+);
+
+INSERT INTO file_types (file_type, description) VALUES ('MTP_RAW', 'Raw data file');
+INSERT INTO file_types (file_type, description) VALUES ('MTP_INPUT1', 'Input file processed by GFF');
+INSERT INTO file_types (file_type, description) VALUES ('MTP_OUTPUT', 'Output file processed by GFP');
+
+INSERT INTO file_type_relationships (parent_file_type, child_file_type) VALUES ('MTP_RAW', 'MTP_INPUT1');
+INSERT INTO file_type_relationships (parent_file_type, child_file_type) VALUES ('MTP_INPUT1', 'MTP_OUTPUT');
+
+
 CREATE TABLE file_type_relationships (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     parent_file_type VARCHAR(50),    -- Parent file type (e.g., MTP_RAW)
